@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <title>Smart Home Dashboard V40</title>
+
+    <style>
+        :root { --bg: #000; --card: #151515; --text: #fff; --accent: #4CAF50; --warn: #ff9800; --bus: #E83434; --action: #FF5252; }
+        body { 
+            background: var(--bg); color: var(--text); font-family: Roboto, "Segoe UI", sans-serif;
+            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; 
+            user-select: none; position: relative; transition: background 0.5s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 按鈕與佈局 */
+        .top-btn-group { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 15px; }
+        .circle-btn { background: rgba(255, 255, 255, 0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4); width: 45px; height: 45px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); transition: all 0.3s; }
+        .circle-btn:active { background: rgba(255,255,255,0.6); transform: scale(0.95); }
+
+        #orbit-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; z-index: 1; opacity: 1; transition: opacity 1s ease; }
+        #orbit-container { width: 95vw; height: 95vh; transition: transform 2s ease-in-out; transform: translate(0, 0); }
+
+        .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 15px; height: 100%; }
+        .card { background: var(--card); border-radius: 16px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+        /* 左欄樣式 */
+        .col-main { display: flex; flex-direction: column; gap: 15px; height: 100%; }
+        .weather-card { flex: 1.5; display: flex; flex-direction: column; padding: 20px; }
+
+        #action-tip { display: none; background: var(--action); color: white; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; font-size: 1.4em; margin-bottom: 10px; animation: flash 2s infinite; box-shadow: 0 0 10px var(--action); }
+        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+
+        .clock-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px; position: relative; }
+        .clock-time { font-size: 3.5em; font-weight: bold; line-height: 1; letter-spacing: -2px; }
+        .clock-date { font-size: 1.1em; color: #aaa; text-align: right; }
+
+        #pause-indicator { display: none; position: absolute; top: 0; left: 160px; background: #d63031; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.9em; font-weight: bold; align-items: center; gap: 5px; box-shadow: 0 0 8px rgba(214, 48, 49, 0.6); }
+
+        #hko-warning-box { display: none; background: #333; color: #fff; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 1em; text-align: center; margin-bottom: 8px; }
+        .warn-red { background: #7f1d1d !important; color: #ffcccc !important; animation: pulse-warn 2s infinite; }
+        @keyframes pulse-warn { 0% { opacity: 0.9; } 50% { opacity: 1; } 100% { opacity: 0.9; } }
+
+        /* 天氣數值區 */
+        .w-main-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0px; /* 改為0，讓下方站點文字靠近 */ }
+        .w-temp-big { font-size: 5em; font-weight: bold; line-height: 1; margin-left: -5px; letter-spacing: -3px; }
+        .w-icon-big { font-size: 4em; margin-right: 10px; }
+        .w-range-box { text-align: right; display: flex; flex-direction: column; justify-content: center; padding-right: 5px; }
+        .wr-high { font-size: 1.6em; color: #ff7675; font-weight: bold; }
+        .wr-low { font-size: 1.6em; color: #74b9ff; font-weight: bold; }
+
+        /* 新增：氣象站顯示樣式 */
+        #w-station { text-align: right; color: #888; font-size: 0.85em; margin-bottom: 12px; font-style: italic; }
+
+        .w-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
+        .w-item { text-align: center; background: #222; border-radius: 6px; padding: 6px; }
+        .w-label { font-size: 0.7em; color: #888; display: block; }
+        .w-val { font-size: 1em; font-weight: bold; color: #ddd; }
+
+        .forecast-row { display: flex; gap: 8px; margin-top: auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; }
+        .f-day { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
+        .fd-name { font-size: 0.8em; color: #aaa; margin-bottom: 2px; text-transform: uppercase; }
+        .fd-icon { font-size: 1.5em; margin-bottom: 2px; }
+        .fd-temp { font-size: 1em; font-weight: bold; color: #fff; }
+
+        .outfit-card { flex: 1; background: #1a1a1a; border-left: 6px solid var(--accent); padding: 15px; display: flex; flex-direction: column; }
+        .outfit-header { font-size: 1.3em; font-weight: bold; color: #fff; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        .outfit-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; flex: 1; overflow: hidden; }
+        .outfit-box { background: #252525; padding: 8px 12px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; }
+        .ob-title { color: #888; font-size: 0.75em; text-transform: uppercase; margin-bottom: 2px; }
+        .ob-content { font-size: 1.1em; color: #fff; line-height: 1.2; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* 右欄樣式 */
+        .col-side { display: flex; flex-direction: column; gap: 15px; height: 100%; }
+        .schedule-box { flex: 0 0 auto; height: 15%; border-top: 4px solid #FFD700; } 
+        .side-title { font-size: 1.1em; color: #aaa; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .schedule-content { font-size: 1.1em; color: #ddd; white-space: pre-wrap; line-height: 1.3; overflow-y: auto; }
+
+        .task-box { flex: 1; border-top: 4px solid var(--accent); min-height: 0; } 
+        .task-title { font-size: 1.4em; color: var(--accent); padding-bottom: 8px; margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid #333; }
+        .task-list { list-style: none; padding: 0; overflow-y: auto; margin: 0; height: 100%; }
+        .task-list li { padding: 10px 5px; border-bottom: 1px solid #333; display: flex; align-items: flex-start; font-size: 1.2em; }
+        .task-checkbox { width: 22px; height: 22px; margin-right: 12px; accent-color: var(--accent); margin-top: 2px; cursor: pointer; }
+        .task-done { text-decoration: line-through; color: #555; }
+
+        .bus-box { flex: 0 0 170px; border-top: 4px solid var(--bus); background: #1a1111; padding-bottom: 10px; }
+        .bus-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 25px; }
+        .bus-badge { background: var(--bus); color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9em; }
+        .bus-compact-list { display: flex; flex-direction: column; gap: 6px; height: 100%; overflow: hidden; }
+        .bus-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #2a1515; border-radius: 6px; height: 38px; box-sizing: border-box; }
+        .bus-row.first { background: #d63031; }
+        .bus-row.first * { color: white !important; font-weight: bold; }
+        .br-time { font-family: monospace; font-size: 1.3em; color: #eee; }
+        .br-min { font-size: 1em; color: #aaa; }
+
+        /* Overlays */
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #start-btn { font-size: 3em; padding: 30px 60px; border-radius: 20px; border: 4px solid var(--accent); background: black; color: var(--accent); cursor: pointer; font-weight: bold; }
+
+        #alert-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(220, 20, 60, 0.98); z-index: 999; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .alert-msg { font-size: 5em; font-weight: bold; margin-bottom: 60px; text-shadow: 2px 2px 0 #000; }
+        .btn-ok { font-size: 3em; padding: 25px 100px; border-radius: 60px; border: none; background: white; color: #D00; font-weight: bold; cursor: pointer; animation: pulse 1s infinite; }
+        .alert-status { font-size: 1.5em; color: #fff; margin-top: 20px; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        #night-saver { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 1000; overflow: hidden; cursor: pointer; }
+        #ns-content { position: absolute; width: 300px; padding: 20px; text-align: center; color: #333; transition: all 1s ease; }
+        #ns-time { font-size: 6em; font-weight: bold; color: #222; font-family: monospace; }
+        
+        body.night-mode #night-saver { display: block; }
+        body.night-mode #orbit-wrapper { opacity: 0; }
+        body.night-mode .top-btn-group { display: none; }
+
+        #settings-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(20,20,20,0.95); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
+        .settings-box { background: #222; width: 500px; padding: 30px; border-radius: 16px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .set-title { font-size: 1.8em; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; color: #fff; }
+        .set-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .set-label { font-size: 1.2em; color: #ccc; }
+        .set-input { background: #333; border: 1px solid #555; color: white; padding: 8px; border-radius: 6px; font-size: 1.1em; width: 150px; text-align: right; }
+        .set-btn-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 30px; }
+        .set-btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 1.1em; cursor: pointer; font-weight: bold; }
+        .btn-save { background: var(--accent); color: white; }
+        .btn-cancel { background: #444; color: white; }
+    </style>
+</head>
+<body>
+    
+    <div class="top-btn-group">
+        <button class="circle-btn" onclick="openSettings()">⚙️</button>
+        <button class="circle-btn" onclick="toggleFullScreen()">⛶</button>
+    </div>
+
+    <div id="start-overlay"><button id="start-btn">👆 CLICK TO START</button></div>
+    
+    <div id="night-saver" onclick="wakeUp()">
+        <div id="ns-content"><div id="ns-time">00:00</div></div>
+    </div>
+
+    <div id="settings-overlay">
+        <div class="settings-box">
+            <div class="set-title">⚙️ Settings</div>
+            <div class="set-row"><span class="set-label">Night Start (Hr)</span><input type="number" id="cfg-night-start" class="set-input" min="0" max="23"></div>
+            <div class="set-row"><span class="set-label">Night End (Hr)</span><input type="number" id="cfg-night-end" class="set-input" min="0" max="23"></div>
+            <div class="set-row"><span class="set-label">Wake Time (Min)</span><input type="number" id="cfg-wake-mins" class="set-input" min="1" max="60"></div>
+            <div class="set-row"><span class="set-label">Bus Route</span><input type="text" id="cfg-bus-route" class="set-input"></div>
+            <div class="set-row"><span class="set-label">Stop Keyword</span><input type="text" id="cfg-bus-stop" class="set-input"></div>
+            <div class="set-btn-row">
+                <button class="set-btn btn-cancel" onclick="closeSettings()">Cancel</button>
+                <button class="set-btn btn-save" onclick="saveSettings()">Save & Reload</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alert-overlay">
+        <div class="alert-msg" id="alert-text">Msg</div>
+        <button class="btn-ok" onclick="confirmMsg()">OK</button>
+        <div class="alert-status" id="alert-status-text"></div>
+    </div>
+
+    <div id="orbit-wrapper">
+        <div id="orbit-container">
+            <div class="grid">
+                <div class="col-main">
+                    <div class="card weather-card">
+                        <div class="clock-header">
+                            <div class="clock-time" id="clock">00:00</div>
+                            <div id="pause-indicator">🔕 PAUSED</div>
+                            <div class="clock-date" id="date">Loading...</div>
+                        </div>
+                        <div id="action-tip">...</div>
+                        <div id="hko-warning-box">⚠️ Warning</div>
+                        <div class="w-main-row">
+                            <div style="display:flex; align-items:center;">
+                                <div class="w-icon-big" id="w-icon">☁️</div>
+                                <div class="w-temp-big"><span id="w-temp">--</span>°</div>
+                            </div>
+                            <div class="w-range-box">
+                                <div class="wr-high" id="w-max">--°</div>
+                                <div class="wr-low" id="w-min">--°</div>
+                            </div>
+                        </div>
+                        <div id="w-station">Locating...</div>
+
+                        <div class="w-grid">
+                            <div class="w-item"><span class="w-label">FEELS</span><span class="w-val" id="w-feels">--°</span></div>
+                            <div class="w-item"><span class="w-label">HUMID</span><span class="w-val" id="w-hum">--%</span></div>
+                            <div class="w-item"><span class="w-label">WIND</span><span class="w-val" id="w-wind">--</span></div>
+                            <div class="w-item"><span class="w-label">RAIN</span><span class="w-val" id="w-rain">--%</span></div>
+                        </div>
+                        <div class="forecast-row" id="forecast-container"></div>
+                    </div>
+
+                    <div class="card outfit-card" id="outfit-card">
+                        <div class="outfit-header"><span>👶 Kid's Outfit</span></div>
+                        <div class="outfit-grid">
+                            <div class="outfit-box"><span class="ob-title">👕 Top</span><div class="ob-content" id="k-top">...</div></div>
+                            <div class="outfit-box"><span class="ob-title">🧥 Outer</span><div class="ob-content" id="k-outer">...</div></div>
+                            <div class="outfit-box"><span class="ob-title">👖 Bottom</span><div class="ob-content" id="k-pants">...</div></div>
+                            <div class="outfit-box"><span class="ob-title">🎒 Extra</span><div class="ob-content" id="k-extra">...</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-side">
+                    <div class="card schedule-box">
+                        <div class="side-title">📅 Schedule</div>
+                        <div class="schedule-content" id="schedule-text">Loading...</div>
+                    </div>
+                    <div class="card task-box">
+                        <div class="task-title">✅ To-Do List</div>
+                        <ul class="task-list" id="task-list"></ul>
+                    </div>
+                    <div class="card bus-box">
+                        <div class="bus-header-row">
+                            <span class="bus-badge" id="bus-badge">...</span>
+                            <span style="font-size:0.8em;color:#888;" id="bus-name">...</span>
+                        </div>
+                        <div id="bus-container" class="bus-compact-list">
+                            <div style="text-align:center; color:#666; padding:10px;">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // ================= CONFIG =================
+        let config = { nightStart: 0, nightEnd: 6, wakeMins: 5, busRoute: "273B", busStopKey: "御景峰" };
+        function loadConfig() {
+            const stored = localStorage.getItem('sh_config_v40');
+            if(stored) { try { config = {...config, ...JSON.parse(stored)}; } catch(e){} }
+            const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+            set('cfg-night-start', config.nightStart); set('cfg-night-end', config.nightEnd);
+            set('cfg-wake-mins', config.wakeMins); set('cfg-bus-route', config.busRoute); set('cfg-bus-stop', config.busStopKey);
+            document.getElementById('bus-badge').innerText = config.busRoute;
+            document.getElementById('bus-name').innerText = config.busStopKey;
+        }
+        loadConfig();
+
+        window.openSettings = function() { document.getElementById('settings-overlay').style.display = 'flex'; }
+        window.closeSettings = function() { document.getElementById('settings-overlay').style.display = 'none'; }
+        window.saveSettings = function() {
+            config.nightStart = parseInt(document.getElementById('cfg-night-start').value);
+            config.nightEnd = parseInt(document.getElementById('cfg-night-end').value);
+            config.wakeMins = parseInt(document.getElementById('cfg-wake-mins').value);
+            config.busRoute = document.getElementById('cfg-bus-route').value;
+            config.busStopKey = document.getElementById('cfg-bus-stop').value;
+            localStorage.setItem('sh_config_v40', JSON.stringify(config));
+            location.reload();
+        }
+
+        // ================= FIREBASE (Fill your keys) =================
+const firebaseConfig = {
+  apiKey: "AIzaSyBEEE8jshpb46aPielTdruC65bqRDto4Cw",
+  authDomain: "my-home-dashboard-63da3.firebaseapp.com",
+  databaseURL: "https://my-home-dashboard-63da3-default-rtdb.firebaseio.com",
+  projectId: "my-home-dashboard-63da3",
+  storageBucket: "my-home-dashboard-63da3.firebasestorage.app",
+  messagingSenderId: "1088397829512",
+  appId: "1:1088397829512:web:25370367a4dee3e807463d",
+  measurementId: "G-T51ED3F8ZB"
+};
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // ================= SYSTEM LOGIC =================
+        let isSystemPaused = false;
+        onValue(ref(db, 'system/pause'), (snap) => {
+            isSystemPaused = snap.val() === true;
+            const indicator = document.getElementById('pause-indicator');
+            if (isSystemPaused) { indicator.style.display = 'flex'; stopAlertSequence(); document.getElementById('alert-overlay').style.display = 'none'; } 
+            else { indicator.style.display = 'none'; }
+        });
+
+        let wakeExpiryTime = 0; 
+        window.wakeUp = function() { wakeExpiryTime = Date.now() + (config.wakeMins * 60 * 1000); updateClock(); }
+        document.body.addEventListener('click', () => { window.wakeUp(); });
+        document.body.addEventListener('touchstart', () => { window.wakeUp(); });
+
+        function shiftScreen() {
+            if (document.body.classList.contains('night-mode')) return;
+            const container = document.getElementById('orbit-container');
+            const range = 2.0; 
+            container.style.transform = `translate(${(Math.random()*range*2)-range}vw, ${(Math.random()*range*2)-range}vh)`;
+        }
+        setInterval(shiftScreen, 5 * 60 * 1000);
+
+        function moveNightSaver() {
+            if (!document.body.classList.contains('night-mode')) return;
+            const content = document.getElementById('ns-content');
+            content.style.top = (Math.floor(Math.random() * 80) + 5) + "%";
+            content.style.left = (Math.floor(Math.random() * 80) + 5) + "%";
+        }
+        setInterval(moveNightSaver, 60000);
+
+        function updateClock() {
+            const now = new Date();
+            const h = now.getHours(); const m = String(now.getMinutes()).padStart(2,'0');
+            const timeStr = `${h}:${m}`;
+            document.getElementById('clock').innerText = timeStr;
+            document.getElementById('ns-time').innerText = timeStr;
+            document.getElementById('date').innerText = now.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+            
+            const isNightWindow = (h >= config.nightStart && h < config.nightEnd);
+            const isAwake = Date.now() < wakeExpiryTime;
+
+            if (isNightWindow) {
+                if (isAwake) { document.body.classList.remove('night-mode'); } 
+                else { if (!document.body.classList.contains('night-mode')) { document.body.classList.add('night-mode'); moveNightSaver(); } }
+            } else { document.body.classList.remove('night-mode'); }
+        }
+        setInterval(updateClock, 1000);
+
+        // ================= AUDIO =================
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function playMelody() {
+            if (!audioCtx) initAudio(); if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const notes = [{ f: 739.99, t: 0.0, d: 2.5 }, { f: 587.33, t: 0.5, d: 2.5 }, { f: 440.00, t: 1.0, d: 2.5 }, { f: 587.33, t: 1.5, d: 2.5 }, { f: 659.25, t: 2.0, d: 2.5 }, { f: 880.00, t: 2.5, d: 3.5 }];
+            notes.forEach(n => {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.type = 'sine'; osc.frequency.value = n.f;
+                gain.gain.setValueAtTime(0, now + n.t); gain.gain.linearRampToValueAtTime(0.3, now + n.t + 0.03); gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
+                osc.start(now + n.t); osc.stop(now + n.t + n.d);
+            });
+        }
+
+        document.getElementById('start-btn').addEventListener('click', async () => {
+            initAudio(); playMelody(); 
+            document.getElementById('start-overlay').style.display = 'none';
+            initWeather(); fetchHKOWarning(); findBusStop(); shiftScreen(); window.wakeUp();
+            try { document.documentElement.requestFullscreen(); } catch(e){}
+        });
+
+        // ================= ALERTS =================
+        let alertState = { active: false, timer: null, cycleCount: 0, snoozeTimer: null };
+        onValue(ref(db, 'notification'), (snap) => {
+            if (isSystemPaused) return;
+            const data = snap.val();
+            if(data && data.status === 'unread') { if (!alertState.active) { window.wakeUp(); startAlertSequence(data.text); } } 
+            else { stopAlertSequence(); document.getElementById('alert-overlay').style.display = 'none'; }
+        });
+        function startAlertSequence(msg) { alertState.active = true; alertState.cycleCount = 0; document.getElementById('alert-text').innerText = msg; runAlertCycle(); }
+        function runAlertCycle() {
+            if (isSystemPaused || alertState.cycleCount >= 3) { stopAlertSequence(); return; }
+            const alertBox = document.getElementById('alert-overlay'); alertBox.style.display = 'flex';
+            document.getElementById('alert-status-text').innerText = `Attempt ${alertState.cycleCount + 1}/3`;
+            if (!alertState.timer) { playMelody(); alertState.timer = setInterval(playMelody, 9000); }
+            alertState.snoozeTimer = setTimeout(() => { clearInterval(alertState.timer); alertState.timer = null; alertBox.style.display = 'none'; alertState.cycleCount++; alertState.snoozeTimer = setTimeout(runAlertCycle, 5 * 60000); }, 60000);
+        }
+        function stopAlertSequence() { alertState.active = false; clearInterval(alertState.timer); alertState.timer = null; clearTimeout(alertState.snoozeTimer); }
+        window.confirmMsg = function() { update(ref(db, 'notification'), { status: 'read' }); window.wakeUp(); };
+        window.toggleFullScreen = function() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
+
+        // ================= DATA (Schedule/Tasks) =================
+        onValue(ref(db, 'schedule'), (snap) => { document.getElementById('schedule-text').innerText = (snap.val()||{})[new Date().toLocaleDateString('en-CA')] || "Free day."; });
+        onValue(ref(db, 'tasks'), (snap) => {
+            const list = document.getElementById('task-list'); list.innerHTML = "";
+            const tasks = snap.val() || {};
+            Object.keys(tasks).forEach(key => {
+                const t = tasks[key];
+                const li = document.createElement('li');
+                li.innerHTML = `<input type='checkbox' class='task-checkbox' ${t.done?'checked':''} onchange="toggleTask('${key}', this.checked)"><span class='${t.done?'task-done':''}'>${t.text}</span>`;
+                list.appendChild(li);
+            });
+        });
+        window.toggleTask = function(key, done) { update(ref(db, 'tasks/'+key), { done }); window.wakeUp(); };
+
+        // ================= WEATHER (HKO + Open-Meteo) =================
+        // 指定天文台氣象站名稱 (英文)
+        const HKO_STATION = "Sheung Shui"; 
+
+        async function fetchWeather() {
+            // 1. 抓取香港天文台即時天氣
+            try {
+                const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en');
+                const hkoData = await res.json();
+                
+                // 找尋上水溫度，若無則用天文台總部
+                const stationData = hkoData.temperature.data.find(s => s.place === HKO_STATION);
+                
+                let currentTemp = 0;
+                let activeStationName = "";
+
+                if (stationData) {
+                    currentTemp = stationData.value;
+                    activeStationName = "📍 " + HKO_STATION;
+                } else {
+                    currentTemp = hkoData.temperature.data[0].value;
+                    activeStationName = "📍 HKO Headquarters (Fallback)";
+                }
+
+                const currentHum = hkoData.humidity.data[0].value;
+                const hkoIconCode = hkoData.icon[0];
+
+                document.getElementById('w-temp').innerText = currentTemp;
+                document.getElementById('w-hum').innerText = currentHum + "%";
+                document.getElementById('w-icon').innerText = getHKOIcon(hkoIconCode);
+                
+                // 更新顯示的氣象站名稱
+                document.getElementById('w-station').innerText = activeStationName;
+
+                updateOutfit(currentTemp);
+
+            } catch(e) { 
+                console.error("HKO Fetch Error:", e); 
+                document.getElementById('w-station').innerText = "⚠️ Connection Error";
+            }
+
+            // 2. Open-Meteo (用於體感/預報/降雨機率) - 座標鎖定上水
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=22.50&longitude=114.12&current=apparent_temperature,wind_speed_10m&daily=precipitation_probability_max,temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=4`;
+                const res = await fetch(url); const data = await res.json();
+                const cur = data.current; const daily = data.daily;
+
+                document.getElementById('w-feels').innerText = Math.round(cur.apparent_temperature) + "°";
+                document.getElementById('w-wind').innerText = Math.round(cur.wind_speed_10m);
+                document.getElementById('w-rain').innerText = daily.precipitation_probability_max[0] + "%";
+                document.getElementById('w-max').innerText = "↑" + Math.round(daily.temperature_2m_max[0]) + "°";
+                document.getElementById('w-min').innerText = "↓" + Math.round(daily.temperature_2m_min[0]) + "°";
+
+                const fContainer = document.getElementById('forecast-container'); fContainer.innerHTML = "";
+                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                for (let i = 1; i <= 3; i++) {
+                    const d = new Date(daily.time[i]);
+                    const div = document.createElement('div'); div.className = "f-day";
+                    div.innerHTML = `<span class="fd-name">${days[d.getDay()]}</span><span class="fd-icon">${getOpenMeteoIcon(daily.weather_code[i])}</span><span class="fd-temp">${Math.round(daily.temperature_2m_max[i])}°</span>`;
+                    fContainer.appendChild(div);
+                }
+
+                const actionBox = document.getElementById('action-tip');
+                if (daily.precipitation_probability_max[0] >= 60) { actionBox.innerHTML = "☁️ Rain soon? Take in laundry!"; actionBox.style.display = "block"; } 
+                else { actionBox.style.display = "none"; }
+            } catch(e) { console.error("Forecast Error:", e); }
+        }
+
+        function updateOutfit(temp) {
+            let kTop="", kOuter="", kPants="", kExtra="", color = "#4CAF50"; 
+            if (temp <= 12) { color = "#34495e"; kTop = "Thermal"; kOuter = "Down Jkt"; kPants = "Fleece"; kExtra = "Scarf"; }
+            else if (temp <= 17) { color = "#2980b9"; kTop = "Long Tee"; kOuter = "Padded"; kPants = "Trousers"; kExtra = "Vest"; }
+            else if (temp <= 23) { color = "#27ae60"; kTop = "Cotton Tee"; kOuter = "Cardigan"; kPants = "Leggings"; kExtra = "Layering"; }
+            else if (temp <= 27) { color = "#f39c12"; kTop = "Short Slv"; kOuter = "Windbrk"; kPants = "Thin Pants"; kExtra = "Patch"; }
+            else { color = "#c0392b"; kTop = "Tank Top"; kOuter = "None"; kPants = "Shorts"; kExtra = "Water"; }
+            document.getElementById('k-top').innerText = kTop; document.getElementById('k-outer').innerText = kOuter;
+            document.getElementById('k-pants').innerText = kPants; document.getElementById('k-extra').innerText = kExtra;
+            document.getElementById('outfit-card').style.borderLeftColor = color;
+        }
+
+        function getHKOIcon(code) {
+            if (code >= 50 && code <= 54) return "☀️";
+            if (code >= 60 && code <= 65) return "🌧️";
+            if (code >= 70 && code <= 77) return "🌙";
+            if (code >= 80 && code <= 85) return "🍃";
+            if (code >= 90 && code <= 93) return "⛈️";
+            return "☁️";
+        }
+        function getOpenMeteoIcon(code) { 
+            if(code===0) return "☀️"; if(code<=3) return "⛅"; if(code<=48) return "🌫️"; 
+            if(code>=51 && code<=67) return "🌧️"; if(code>=71 && code<=86) return "🌨️"; if(code>=95) return "⛈️"; return "☁️"; 
+        }
+
+        async function fetchHKOWarning() {
+            try {
+                const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=en'); const data = await res.json();
+                const box = document.getElementById('hko-warning-box');
+                if (!data || Object.keys(data).length === 0) { box.style.display = 'none'; return; }
+                let wList = []; let isSevere = false;
+                Object.values(data).forEach(w => { wList.push(w.name); if (w.code.match(/RED|BLACK|TC8|TC9|TC10/)) isSevere = true; });
+                box.innerHTML = "⚠️ " + wList.join(" | "); box.className = isSevere ? 'warn-red' : ''; box.style.display = 'block';
+            } catch(e) {}
+        }
+
+        let targetStopSeq = null; 
+        async function findBusStop() {
+            const container = document.getElementById('bus-container'); 
+            try {
+                const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${config.busRoute}/outbound/1`);
+                const data = await res.json(); const stops = data.data; 
+                for (let i = 0; i < stops.length; i++) {
+                    const detail = await (await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stops[i].stop}`)).json();
+                    if (detail.data.name_tc.includes(config.busStopKey)) { targetStopSeq = stops[i].seq; fetchBusETA(); setInterval(fetchBusETA, 30000); return; }
+                }
+                container.innerHTML = "Stop Not Found";
+            } catch(e) { container.innerHTML = "Err: Invalid Route"; }
+        }
+        async function fetchBusETA() {
+            if (!targetStopSeq) return;
+            try {
+                const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${config.busRoute}/1`); const json = await res.json();
+                const buses = json.data.filter(b => parseInt(b.seq) === parseInt(targetStopSeq)).sort((a, b) => new Date(a.eta) - new Date(b.eta)).slice(0, 3); 
+                const container = document.getElementById('bus-container'); container.innerHTML = "";
+                buses.forEach((bus, index) => {
+                    if (!bus.eta) return;
+                    const diffMins = Math.floor((new Date(bus.eta) - new Date()) / 60000);
+                    if (diffMins < -1) return;
+                    const div = document.createElement('div'); div.className = "bus-row" + (index === 0 ? " first" : "");
+                    div.innerHTML = `<span class="br-time">${new Date(bus.eta).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span><span class="br-min">${(diffMins <= 0) ? "Arr" : diffMins + "m"}</span>`;
+                    container.appendChild(div);
+                });
+            } catch(e) {}
+        }
+        function initWeather() { fetchWeather(); }
+
+        setInterval(fetchWeather, 300000); // 5 mins
+        setInterval(fetchHKOWarning, 600000); // 10 mins
+        updateClock();
+    </script>
+</body>
+</html>
