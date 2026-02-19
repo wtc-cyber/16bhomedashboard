@@ -1,520 +1,855 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
+    <title>HK Smart Home Dashboard</title>
     
-    <title>Smart Home Dashboard V40</title>
+    <!-- 外部資源 -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
 
+    <!-- ========================================================================================== -->
+    <!--                                        CSS 樣式區域                                         -->
+    <!-- ========================================================================================== -->
     <style>
-        :root { --bg: #000; --card: #151515; --text: #fff; --accent: #4CAF50; --warn: #ff9800; --bus: #E83434; --action: #FF5252; }
-        body { 
-            background: var(--bg); color: var(--text); font-family: Roboto, "Segoe UI", sans-serif;
-            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden; 
-            user-select: none; position: relative; transition: background 0.5s;
-            -webkit-tap-highlight-color: transparent;
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --accent: #38bdf8;
+            --danger: #ef4444;
+            --font-main: 'Noto Sans TC', sans-serif;
+            --font-mono: 'Roboto Mono', monospace;
         }
 
-        /* 按鈕與佈局 */
-        .top-btn-group { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 15px; }
-        .circle-btn { background: rgba(255, 255, 255, 0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4); width: 45px; height: 45px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); transition: all 0.3s; }
-        .circle-btn:active { background: rgba(255,255,255,0.6); transform: scale(0.95); }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            margin: 0;
+            font-size: 14px;
+        }
 
-        #orbit-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; z-index: 1; opacity: 1; transition: opacity 1s ease; }
-        #orbit-container { width: 95vw; height: 95vh; transition: transform 2s ease-in-out; transform: translate(0, 0); }
+        /* 錯誤訊息顯示區 (Debug) */
+        #error-console {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            background: rgba(220, 38, 38, 0.9);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 99999;
+            white-space: pre-wrap;
+            pointer-events: none;
+        }
 
-        .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 15px; height: 100%; }
-        .card { background: var(--card); border-radius: 16px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        #app-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+            box-sizing: border-box;
+            transition: transform 1s ease-in-out;
+        }
 
-        /* 左欄樣式 */
-        .col-main { display: flex; flex-direction: column; gap: 15px; height: 100%; }
-        .weather-card { flex: 1.5; display: flex; flex-direction: column; padding: 20px; }
+        header, footer { flex-shrink: 0; }
 
-        #action-tip { display: none; background: var(--action); color: white; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; font-size: 1.4em; margin-bottom: 10px; animation: flash 2s infinite; box-shadow: 0 0 10px var(--action); }
-        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        main {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: 40% 35% 25%;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
 
-        .clock-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px; position: relative; }
-        .clock-time { font-size: 3.5em; font-weight: bold; line-height: 1; letter-spacing: -2px; }
-        .clock-date { font-size: 1.1em; color: #aaa; text-align: right; }
+        @media (min-width: 768px) {
+            main {
+                grid-template-columns: repeat(12, minmax(0, 1fr));
+                grid-template-rows: 1fr; 
+                gap: 1rem;
+                margin-top: 1rem;
+                margin-bottom: 1rem;
+            }
+        }
 
-        #pause-indicator { display: none; position: absolute; top: 0; left: 160px; background: #d63031; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.9em; font-weight: bold; align-items: center; gap: 5px; box-shadow: 0 0 8px rgba(214, 48, 49, 0.6); }
+        .glass-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+            position: relative;
+        }
 
-        #hko-warning-box { display: none; background: #333; color: #fff; padding: 6px; border-radius: 6px; font-weight: bold; font-size: 1em; text-align: center; margin-bottom: 8px; }
-        .warn-red { background: #7f1d1d !important; color: #ffcccc !important; animation: pulse-warn 2s infinite; }
-        @keyframes pulse-warn { 0% { opacity: 0.9; } 50% { opacity: 1; } 100% { opacity: 0.9; } }
+        .scroll-content {
+            overflow-y: auto;
+            flex: 1;
+            scrollbar-width: none; 
+            -ms-overflow-style: none;
+        }
+        .scroll-content::-webkit-scrollbar { display: none; }
 
-        /* 天氣數值區 */
-        .w-main-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0px; /* 改為0，讓下方站點文字靠近 */ }
-        .w-temp-big { font-size: 5em; font-weight: bold; line-height: 1; margin-left: -5px; letter-spacing: -3px; }
-        .w-icon-big { font-size: 4em; margin-right: 10px; }
-        .w-range-box { text-align: right; display: flex; flex-direction: column; justify-content: center; padding-right: 5px; }
-        .wr-high { font-size: 1.6em; color: #ff7675; font-weight: bold; }
-        .wr-low { font-size: 1.6em; color: #74b9ff; font-weight: bold; }
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.5rem;
+            color: var(--text-dim);
+            transition: all 0.2s;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+        }
+        .control-btn:hover { background: rgba(255, 255, 255, 0.2); color: white; }
 
-        /* 新增：氣象站顯示樣式 */
-        #w-station { text-align: right; color: #888; font-size: 0.85em; margin-bottom: 12px; font-style: italic; }
+        /* Settings Overlay UI */
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 0.4rem;
+        }
+        .setting-input {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: white;
+            padding: 0.2rem 0.4rem;
+            border-radius: 0.25rem;
+            width: 100px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
 
-        .w-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
-        .w-item { text-align: center; background: #222; border-radius: 6px; padding: 6px; }
-        .w-label { font-size: 0.7em; color: #888; display: block; }
-        .w-val { font-size: 1em; font-weight: bold; color: #ddd; }
-
-        .forecast-row { display: flex; gap: 8px; margin-top: auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; }
-        .f-day { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
-        .fd-name { font-size: 0.8em; color: #aaa; margin-bottom: 2px; text-transform: uppercase; }
-        .fd-icon { font-size: 1.5em; margin-bottom: 2px; }
-        .fd-temp { font-size: 1em; font-weight: bold; color: #fff; }
-
-        .outfit-card { flex: 1; background: #1a1a1a; border-left: 6px solid var(--accent); padding: 15px; display: flex; flex-direction: column; }
-        .outfit-header { font-size: 1.3em; font-weight: bold; color: #fff; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 5px;}
-        .outfit-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; flex: 1; overflow: hidden; }
-        .outfit-box { background: #252525; padding: 8px 12px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; }
-        .ob-title { color: #888; font-size: 0.75em; text-transform: uppercase; margin-bottom: 2px; }
-        .ob-content { font-size: 1.1em; color: #fff; line-height: 1.2; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        /* 右欄樣式 */
-        .col-side { display: flex; flex-direction: column; gap: 15px; height: 100%; }
-        .schedule-box { flex: 0 0 auto; height: 15%; border-top: 4px solid #FFD700; } 
-        .side-title { font-size: 1.1em; color: #aaa; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 4px; }
-        .schedule-content { font-size: 1.1em; color: #ddd; white-space: pre-wrap; line-height: 1.3; overflow-y: auto; }
-
-        .task-box { flex: 1; border-top: 4px solid var(--accent); min-height: 0; } 
-        .task-title { font-size: 1.4em; color: var(--accent); padding-bottom: 8px; margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid #333; }
-        .task-list { list-style: none; padding: 0; overflow-y: auto; margin: 0; height: 100%; }
-        .task-list li { padding: 10px 5px; border-bottom: 1px solid #333; display: flex; align-items: flex-start; font-size: 1.2em; }
-        .task-checkbox { width: 22px; height: 22px; margin-right: 12px; accent-color: var(--accent); margin-top: 2px; cursor: pointer; }
-        .task-done { text-decoration: line-through; color: #555; }
-
-        .bus-box { flex: 0 0 170px; border-top: 4px solid var(--bus); background: #1a1111; padding-bottom: 10px; }
-        .bus-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 25px; }
-        .bus-badge { background: var(--bus); color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9em; }
-        .bus-compact-list { display: flex; flex-direction: column; gap: 6px; height: 100%; overflow: hidden; }
-        .bus-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #2a1515; border-radius: 6px; height: 38px; box-sizing: border-box; }
-        .bus-row.first { background: #d63031; }
-        .bus-row.first * { color: white !important; font-weight: bold; }
-        .br-time { font-family: monospace; font-size: 1.3em; color: #eee; }
-        .br-min { font-size: 1em; color: #aaa; }
-
-        /* Overlays */
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #start-btn { font-size: 3em; padding: 30px 60px; border-radius: 20px; border: 4px solid var(--accent); background: black; color: var(--accent); cursor: pointer; font-weight: bold; }
-
-        #alert-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(220, 20, 60, 0.98); z-index: 999; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-        .alert-msg { font-size: 5em; font-weight: bold; margin-bottom: 60px; text-shadow: 2px 2px 0 #000; }
-        .btn-ok { font-size: 3em; padding: 25px 100px; border-radius: 60px; border: none; background: white; color: #D00; font-weight: bold; cursor: pointer; animation: pulse 1s infinite; }
-        .alert-status { font-size: 1.5em; color: #fff; margin-top: 20px; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-
-        #night-saver { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 1000; overflow: hidden; cursor: pointer; }
-        #ns-content { position: absolute; width: 300px; padding: 20px; text-align: center; color: #333; transition: all 1s ease; }
-        #ns-time { font-size: 6em; font-weight: bold; color: #222; font-family: monospace; }
+        /* Hardware Protection */
+        body.deep-sleep { background-color: #000000 !important; }
+        body.deep-sleep #app-container > *:not(#header-section) { display: none !important; }
+        body.deep-sleep #header-section {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%; text-align: center;
+            display: block !important;
+        }
+        body.deep-sleep .hide-in-sleep { display: none; }
+        body.deep-sleep #date { display: none; }
+        body.deep-sleep #warning-container { display: none; }
         
-        body.night-mode #night-saver { display: block; }
-        body.night-mode #orbit-wrapper { opacity: 0; }
-        body.night-mode .top-btn-group { display: none; }
+        .ticker-wrap { width: 100%; overflow: hidden; white-space: nowrap; }
+        .ticker { display: inline-block; animation: ticker 80s linear infinite; }
+        @keyframes ticker { 0% { transform: translate3d(100%, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
 
-        #settings-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(20,20,20,0.95); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
-        .settings-box { background: #222; width: 500px; padding: 30px; border-radius: 16px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .set-title { font-size: 1.8em; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; color: #fff; }
-        .set-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .set-label { font-size: 1.2em; color: #ccc; }
-        .set-input { background: #333; border: 1px solid #555; color: white; padding: 8px; border-radius: 6px; font-size: 1.1em; width: 150px; text-align: right; }
-        .set-btn-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 30px; }
-        .set-btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 1.1em; cursor: pointer; font-weight: bold; }
-        .btn-save { background: var(--accent); color: white; }
-        .btn-cancel { background: #444; color: white; }
+        #alert-overlay, #setup-overlay, #settings-overlay {
+            position: fixed; inset: 0; z-index: 50;
+            display: none; 
+            justify-content: center; align-items: center;
+        }
+        #alert-overlay { background: var(--danger); z-index: 9999; flex-direction: column; animation: pulse-red 2s infinite; }
+        #setup-overlay { background: rgba(0,0,0,0.9); z-index: 10000; display: flex; }
+        #settings-overlay { background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); }
+
+        @keyframes pulse-red { 0% { background: #7f1d1d; } 50% { background: #ef4444; } 100% { background: #7f1d1d; } }
+
+        /* Weather Forecast Grid Fixed */
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            text-align: center;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            width: 100%;
+            flex-shrink: 0; 
+            margin-top: auto; 
+            background: rgba(0,0,0,0.1);
+            padding-bottom: 0.5rem;
+        }
+        
+        /* Flex fix for weather card content */
+        .weather-card-content {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            justify-content: space-between;
+            overflow: hidden; 
+        }
+
+        /* NEW: Internal Weather Warning Styles - Fixed */
+        #inner-warning-container {
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            overflow-y: auto;
+            flex: 1; 
+            min-height: 0;
+        }
+        
+        .warning-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: rgba(220, 38, 38, 0.2);
+            border: 1px solid rgba(220, 38, 38, 0.4);
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            color: #fca5a5;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .warning-icon {
+            height: 36px;
+            width: auto;
+            display: block;
+            margin-right: 0.5rem;
+        }
+        
+        /* Bus Card Styles */
+        .bus-info-header {
+            border-top: 1px solid rgba(255,255,255,0.2);
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+            padding: 0.25rem 0;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Text Clamping Utility */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
-    
-    <div class="top-btn-group">
-        <button class="circle-btn" onclick="openSettings()">⚙️</button>
-        <button class="circle-btn" onclick="toggleFullScreen()">⛶</button>
+
+    <!-- 除錯訊息顯示 -->
+    <div id="error-console"></div>
+
+    <!-- ========================================================================================== -->
+    <!--                                       HTML 結構區域                                         -->
+    <!-- ========================================================================================== -->
+
+    <!-- Setup Overlay -->
+    <div id="setup-overlay">
+        <div class="text-center px-4">
+            <h1 class="text-3xl font-bold mb-4">Smart Dashboard</h1>
+            <p class="mb-6 text-gray-400">Tap to initialize System</p>
+            <button id="start-btn" class="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-full text-xl font-bold transition shadow-lg shadow-blue-500/50">
+                Start / 啟動
+            </button>
+            <p id="firebase-warning" class="hidden text-red-400 text-sm mt-4 font-bold border border-red-500 p-2 rounded">
+                ⚠ 注意：Firebase 未設定，待辦事項無法同步。<br>請在代碼中填入 API Key。
+            </p>
+        </div>
     </div>
 
-    <div id="start-overlay"><button id="start-btn">👆 CLICK TO START</button></div>
-    
-    <div id="night-saver" onclick="wakeUp()">
-        <div id="ns-content"><div id="ns-time">00:00</div></div>
-    </div>
-
+    <!-- Local Settings Overlay (Backup) -->
     <div id="settings-overlay">
-        <div class="settings-box">
-            <div class="set-title">⚙️ Settings</div>
-            <div class="set-row"><span class="set-label">Night Start (Hr)</span><input type="number" id="cfg-night-start" class="set-input" min="0" max="23"></div>
-            <div class="set-row"><span class="set-label">Night End (Hr)</span><input type="number" id="cfg-night-end" class="set-input" min="0" max="23"></div>
-            <div class="set-row"><span class="set-label">Wake Time (Min)</span><input type="number" id="cfg-wake-mins" class="set-input" min="1" max="60"></div>
-            <div class="set-row"><span class="set-label">Bus Route</span><input type="text" id="cfg-bus-route" class="set-input"></div>
-            <div class="set-row"><span class="set-label">Stop Keyword</span><input type="text" id="cfg-bus-stop" class="set-input"></div>
-            <div class="set-btn-row">
-                <button class="set-btn btn-cancel" onclick="closeSettings()">Cancel</button>
-                <button class="set-btn btn-save" onclick="saveSettings()">Save & Reload</button>
+        <div class="glass-panel p-8 w-96 max-w-full relative">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white">Local Settings</h2>
+                <button id="close-settings" class="text-gray-400 hover:text-white"><i data-lucide="x"></i></button>
+            </div>
+            <p class="text-yellow-400 text-xs mb-4">Tip: Use the Admin Panel for easier configuration.</p>
+            <div id="settings-form-content">
+                <button id="local-reset-btn" class="w-full bg-red-600 hover:bg-red-500 text-white py-2 rounded font-bold">Reset Config</button>
             </div>
         </div>
     </div>
 
+    <!-- Alert Overlay -->
     <div id="alert-overlay">
-        <div class="alert-msg" id="alert-text">Msg</div>
-        <button class="btn-ok" onclick="confirmMsg()">OK</button>
-        <div class="alert-status" id="alert-status-text"></div>
+        <i data-lucide="siren" class="w-32 h-32 text-white mb-4 animate-bounce"></i>
+        <p id="alert-message" class="text-4xl text-white font-bold mb-8 text-center px-10 leading-tight">...</p>
+        <button id="ack-btn" class="bg-white text-red-600 px-10 py-4 rounded-full text-2xl font-bold shadow-lg">
+            Acknowledge
+        </button>
     </div>
 
-    <div id="orbit-wrapper">
-        <div id="orbit-container">
-            <div class="grid">
-                <div class="col-main">
-                    <div class="card weather-card">
-                        <div class="clock-header">
-                            <div class="clock-time" id="clock">00:00</div>
-                            <div id="pause-indicator">🔕 PAUSED</div>
-                            <div class="clock-date" id="date">Loading...</div>
-                        </div>
-                        <div id="action-tip">...</div>
-                        <div id="hko-warning-box">⚠️ Warning</div>
-                        <div class="w-main-row">
-                            <div style="display:flex; align-items:center;">
-                                <div class="w-icon-big" id="w-icon">☁️</div>
-                                <div class="w-temp-big"><span id="w-temp">--</span>°</div>
-                            </div>
-                            <div class="w-range-box">
-                                <div class="wr-high" id="w-max">--°</div>
-                                <div class="wr-low" id="w-min">--°</div>
-                            </div>
-                        </div>
-                        <div id="w-station">Locating...</div>
-
-                        <div class="w-grid">
-                            <div class="w-item"><span class="w-label">FEELS</span><span class="w-val" id="w-feels">--°</span></div>
-                            <div class="w-item"><span class="w-label">HUMID</span><span class="w-val" id="w-hum">--%</span></div>
-                            <div class="w-item"><span class="w-label">WIND</span><span class="w-val" id="w-wind">--</span></div>
-                            <div class="w-item"><span class="w-label">RAIN</span><span class="w-val" id="w-rain">--%</span></div>
-                        </div>
-                        <div class="forecast-row" id="forecast-container"></div>
-                    </div>
-
-                    <div class="card outfit-card" id="outfit-card">
-                        <div class="outfit-header"><span>👶 Kid's Outfit</span></div>
-                        <div class="outfit-grid">
-                            <div class="outfit-box"><span class="ob-title">👕 Top</span><div class="ob-content" id="k-top">...</div></div>
-                            <div class="outfit-box"><span class="ob-title">🧥 Outer</span><div class="ob-content" id="k-outer">...</div></div>
-                            <div class="outfit-box"><span class="ob-title">👖 Bottom</span><div class="ob-content" id="k-pants">...</div></div>
-                            <div class="outfit-box"><span class="ob-title">🎒 Extra</span><div class="ob-content" id="k-extra">...</div></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-side">
-                    <div class="card schedule-box">
-                        <div class="side-title">📅 Schedule</div>
-                        <div class="schedule-content" id="schedule-text">Loading...</div>
-                    </div>
-                    <div class="card task-box">
-                        <div class="task-title">✅ To-Do List</div>
-                        <ul class="task-list" id="task-list"></ul>
-                    </div>
-                    <div class="card bus-box">
-                        <div class="bus-header-row">
-                            <span class="bus-badge" id="bus-badge">...</span>
-                            <span style="font-size:0.8em;color:#888;" id="bus-name">...</span>
-                        </div>
-                        <div id="bus-container" class="bus-compact-list">
-                            <div style="text-align:center; color:#666; padding:10px;">Loading...</div>
-                        </div>
+    <!-- Main Container -->
+    <div id="app-container">
+        
+        <!-- HEADER -->
+        <header id="header-section" class="flex justify-between items-end pb-2 border-b border-white/10">
+            <div class="flex items-end gap-4">
+                <h1 id="clock" class="clock-display text-5xl font-mono font-bold tracking-tighter text-white leading-none">00:00:00</h1>
+                <div class="flex flex-col mb-1">
+                    <div class="flex items-center gap-2">
+                        <p id="date" class="date-display text-lg text-slate-300 font-light">Loading...</p>
                     </div>
                 </div>
             </div>
-        </div>
+            
+            <div class="flex flex-col items-end gap-1 hide-in-sleep">
+                <div class="flex gap-1">
+                    <button id="lang-btn" class="control-btn"><i data-lucide="globe" class="w-3 h-3"></i></button>
+                    <button id="fullscreen-btn" class="control-btn"><i data-lucide="maximize" class="w-3 h-3"></i></button>
+                    <button id="settings-btn" class="control-btn"><i data-lucide="settings" class="w-3 h-3"></i></button>
+                </div>
+                <div class="flex items-center gap-1 text-yellow-400 text-xs mt-1">
+                    <i data-lucide="sun" class="w-3 h-3"></i>
+                    <span id="holiday-status">Checking...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN -->
+        <main>
+            <!-- COL 1: Weather (Now Full Height) -->
+            <div class="md:col-span-4 flex flex-col gap-4 h-full min-h-0">
+                <article class="glass-panel p-4 flex-1 relative min-h-0">
+                    <div class="absolute top-0 right-0 p-4 opacity-10"><i data-lucide="cloud-rain" class="w-24 h-24"></i></div>
+                    <div class="weather-card-content">
+                        <!-- Top Info -->
+                        <div class="flex-1 flex flex-col justify-start min-h-0 overflow-y-auto scroll-hide">
+                            <div class="flex-shrink-0">
+                                <div class="flex justify-between items-start mb-1">
+                                    <h2 class="text-slate-400 text-xs uppercase tracking-wider" data-i18n="weather_title">HK Weather</h2>
+                                    <span id="weather-source" class="text-[10px] text-green-400 border border-green-800 bg-green-900/30 px-2 py-0.5 rounded">...</span>
+                                </div>
+                                <div class="flex items-end gap-3">
+                                    <span id="temp" class="text-6xl font-bold text-white">--.-°</span>
+                                    <div class="pb-2">
+                                        <p id="humidity" class="text-blue-300 text-base">Hum: --%</p>
+                                        <p id="rain-prob" class="text-slate-400 text-sm">Rain: --mm</p>
+                                    </div>
+                                </div>
+                                <p id="weather-desc" class="text-lg mt-2 font-medium">Initializing...</p>
+                                
+                                <!-- Inner Warning Container -->
+                                <div id="inner-warning-container"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Forecast Grid -->
+                        <div id="forecast-grid" class="forecast-grid"></div>
+                    </div>
+                </article>
+            </div>
+
+            <!-- COL 2: Schedule & Todos -->
+            <div class="md:col-span-4 flex flex-col gap-3 h-full min-h-0">
+                <article id="schedule-panel" class="glass-panel p-4 h-1/2 min-h-0 flex flex-col border-t-4 border-accent transition-all duration-500">
+                    <div class="flex justify-between items-center mb-2 flex-shrink-0">
+                        <h3 class="text-slate-400 uppercase text-xs tracking-wider" data-i18n="schedule_title">Upcoming</h3>
+                        <span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-white">Sync</span>
+                    </div>
+                    <div id="schedule-list" class="space-y-2 scroll-content"></div>
+                </article>
+                
+                <article id="todo-panel" class="glass-panel p-4 h-1/2 min-h-0 flex flex-col transition-all duration-500">
+                    <div class="flex justify-between items-center mb-2 flex-shrink-0">
+                        <h3 class="text-slate-400 uppercase text-xs tracking-wider" data-i18n="todo_title">To-Do</h3>
+                    </div>
+                    <div id="todo-list" class="space-y-2 scroll-content"></div>
+                </article>
+            </div>
+
+            <!-- COL 3: Action Tips (Top) + Bus (Bottom) -->
+            <div class="md:col-span-4 flex flex-col gap-3 h-full min-h-0">
+                
+                <!-- NEW LOCATION: Action Tips (Takes ~30-35% height) -->
+                <article class="glass-panel p-4 h-1/3 min-h-0 flex-shrink-0 flex flex-col">
+                    <div class="flex items-center gap-2 mb-2 text-accent flex-shrink-0">
+                        <i data-lucide="zap" class="w-4 h-4"></i>
+                        <h3 class="font-bold text-sm" data-i18n="suggestion_title">Action Tips</h3>
+                    </div>
+                    <p id="action-tip" class="text-base leading-snug overflow-y-auto pr-1 text-white/90 scroll-content">Analyzing...</p>
+                </article>
+
+                <!-- Bus Arrivals (Takes remaining height) -->
+                <article class="glass-panel p-4 flex-1 flex flex-col relative min-h-0">
+                    <!-- Title -->
+                    <div class="flex items-center gap-2 mb-1 flex-shrink-0">
+                        <i data-lucide="bus" class="text-yellow-500 w-4 h-4"></i>
+                        <h3 class="font-bold text-lg" data-i18n="bus_title">KMB Arrivals</h3>
+                    </div>
+                    
+                    <!-- New Bus Header Layout -->
+                    <div class="bus-info-header flex-shrink-0">
+                        <div class="flex items-center justify-between">
+                            <!-- Shrink Route to text-2xl -->
+                            <span id="bus-route-title" class="text-2xl font-bold text-accent">--</span>
+                            <!-- Shrink Stop Name to text-base -->
+                            <span id="bus-stop-name-display" class="text-base font-bold text-right truncate max-w-[150px]">--</span>
+                        </div>
+                    </div>
+
+                    <!-- List Area -->
+                    <div id="bus-list" class="space-y-2 scroll-content">
+                        <div class="text-center text-slate-500 mt-6 text-sm">Initializing...</div>
+                    </div>
+                    
+                    <!-- Footer Status -->
+                    <div class="mt-auto pt-2 flex justify-between text-[10px] text-slate-500 border-t border-slate-700/50 flex-shrink-0">
+                        <span id="bus-status">Auto-Track</span>
+                    </div>
+                </article>
+            </div>
+        </main>
+
+        <footer class="pt-2 border-t border-slate-800">
+            <div class="flex items-center gap-3">
+                <span class="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded flex-shrink-0">NEWS</span>
+                <div class="ticker-wrap"><div id="news-ticker" class="ticker text-base text-slate-300">Loading News...</div></div>
+            </div>
+        </footer>
     </div>
+
+    <!-- ========================================================================================== -->
+    <!--                                       JS 程式碼區域                                         -->
+    <!-- ========================================================================================== -->
+    
+    <!-- 全局錯誤捕捉 (Debug Mode) -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const consoleBox = document.getElementById('error-console');
+            consoleBox.style.display = 'block';
+            consoleBox.innerText += `❌ ${message} at line ${lineno}\n`;
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+            const consoleBox = document.getElementById('error-console');
+            consoleBox.style.display = 'block';
+            consoleBox.innerText += `❌ Promise Error: ${event.reason}\n`;
+        });
+    </script>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, limit, where, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ================= CONFIG =================
-        let config = { nightStart: 0, nightEnd: 6, wakeMins: 5, busRoute: "273B", busStopKey: "御景峰" };
-        function loadConfig() {
-            const stored = localStorage.getItem('sh_config_v40');
-            if(stored) { try { config = {...config, ...JSON.parse(stored)}; } catch(e){} }
-            const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
-            set('cfg-night-start', config.nightStart); set('cfg-night-end', config.nightEnd);
-            set('cfg-wake-mins', config.wakeMins); set('cfg-bus-route', config.busRoute); set('cfg-bus-stop', config.busStopKey);
-            document.getElementById('bus-badge').innerText = config.busRoute;
-            document.getElementById('bus-name').innerText = config.busStopKey;
-        }
-        loadConfig();
-
-        window.openSettings = function() { document.getElementById('settings-overlay').style.display = 'flex'; }
-        window.closeSettings = function() { document.getElementById('settings-overlay').style.display = 'none'; }
-        window.saveSettings = function() {
-            config.nightStart = parseInt(document.getElementById('cfg-night-start').value);
-            config.nightEnd = parseInt(document.getElementById('cfg-night-end').value);
-            config.wakeMins = parseInt(document.getElementById('cfg-wake-mins').value);
-            config.busRoute = document.getElementById('cfg-bus-route').value;
-            config.busStopKey = document.getElementById('cfg-bus-stop').value;
-            localStorage.setItem('sh_config_v40', JSON.stringify(config));
-            location.reload();
-        }
-
-        // ================= FIREBASE (Fill your keys) =================
-const firebaseConfig = {
-  apiKey: "AIzaSyBEEE8jshpb46aPielTdruC65bqRDto4Cw",
-  authDomain: "my-home-dashboard-63da3.firebaseapp.com",
-  databaseURL: "https://my-home-dashboard-63da3-default-rtdb.firebaseio.com",
-  projectId: "my-home-dashboard-63da3",
-  storageBucket: "my-home-dashboard-63da3.firebasestorage.app",
-  messagingSenderId: "1088397829512",
-  appId: "1:1088397829512:web:25370367a4dee3e807463d",
-  measurementId: "G-T51ED3F8ZB"
+        // -----------------------------------------------------------------------------------------
+        // ⚠️⚠️⚠️ 請在此處填入你的 FIREBASE 設定 (API KEY) ⚠️⚠️⚠️
+        // 如果你沒有填寫，程式將無法連接到資料庫。
+        // -----------------------------------------------------------------------------------------
+        const LOCAL_FIREBASE_CONFIG = { 
+        apiKey: "AIzaSyB7AE6WUyGkVGnA3YjKwd9B10uu-LCowo8",
+  authDomain: "homedashboardv2.firebaseapp.com",
+  projectId: "homedashboardv2",
+  storageBucket: "homedashboardv2.firebasestorage.app",
+  messagingSenderId: "240636392334",
+  appId: "1:240636392334:web:764203fa6e887876cfaadf",
+  measurementId: "G-ZX95TQ0KT6"
 };
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
+        // -----------------------------------------------------------------------------------------
 
-        // ================= SYSTEM LOGIC =================
-        let isSystemPaused = false;
-        onValue(ref(db, 'system/pause'), (snap) => {
-            isSystemPaused = snap.val() === true;
-            const indicator = document.getElementById('pause-indicator');
-            if (isSystemPaused) { indicator.style.display = 'flex'; stopAlertSequence(); document.getElementById('alert-overlay').style.display = 'none'; } 
-            else { indicator.style.display = 'none'; }
-        });
+        const DEFAULT_CONFIG = {
+            lang: 'zh-HK',
+            sleepMode: { startHour: 5, startMin: 59, endHour: 6, endMin: 0 },
+            busConfig: { route: '273B', targetStopName: '御景峰', seq: null, dir: null },
+            weatherStation: 'GPS'
+        };
 
-        let wakeExpiryTime = 0; 
-        window.wakeUp = function() { wakeExpiryTime = Date.now() + (config.wakeMins * 60 * 1000); updateClock(); }
-        document.body.addEventListener('click', () => { window.wakeUp(); });
-        document.body.addEventListener('touchstart', () => { window.wakeUp(); });
-
-        function shiftScreen() {
-            if (document.body.classList.contains('night-mode')) return;
-            const container = document.getElementById('orbit-container');
-            const range = 2.0; 
-            container.style.transform = `translate(${(Math.random()*range*2)-range}vw, ${(Math.random()*range*2)-range}vh)`;
-        }
-        setInterval(shiftScreen, 5 * 60 * 1000);
-
-        function moveNightSaver() {
-            if (!document.body.classList.contains('night-mode')) return;
-            const content = document.getElementById('ns-content');
-            content.style.top = (Math.floor(Math.random() * 80) + 5) + "%";
-            content.style.left = (Math.floor(Math.random() * 80) + 5) + "%";
-        }
-        setInterval(moveNightSaver, 60000);
-
-        function updateClock() {
-            const now = new Date();
-            const h = now.getHours(); const m = String(now.getMinutes()).padStart(2,'0');
-            const timeStr = `${h}:${m}`;
-            document.getElementById('clock').innerText = timeStr;
-            document.getElementById('ns-time').innerText = timeStr;
-            document.getElementById('date').innerText = now.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
-            
-            const isNightWindow = (h >= config.nightStart && h < config.nightEnd);
-            const isAwake = Date.now() < wakeExpiryTime;
-
-            if (isNightWindow) {
-                if (isAwake) { document.body.classList.remove('night-mode'); } 
-                else { if (!document.body.classList.contains('night-mode')) { document.body.classList.add('night-mode'); moveNightSaver(); } }
-            } else { document.body.classList.remove('night-mode'); }
-        }
-        setInterval(updateClock, 1000);
-
-        // ================= AUDIO =================
-        let audioCtx;
-        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-        function playMelody() {
-            if (!audioCtx) initAudio(); if (audioCtx.state === 'suspended') audioCtx.resume();
-            const now = audioCtx.currentTime;
-            const notes = [{ f: 739.99, t: 0.0, d: 2.5 }, { f: 587.33, t: 0.5, d: 2.5 }, { f: 440.00, t: 1.0, d: 2.5 }, { f: 587.33, t: 1.5, d: 2.5 }, { f: 659.25, t: 2.0, d: 2.5 }, { f: 880.00, t: 2.5, d: 3.5 }];
-            notes.forEach(n => {
-                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
-                osc.connect(gain); gain.connect(audioCtx.destination);
-                osc.type = 'sine'; osc.frequency.value = n.f;
-                gain.gain.setValueAtTime(0, now + n.t); gain.gain.linearRampToValueAtTime(0.3, now + n.t + 0.03); gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
-                osc.start(now + n.t); osc.stop(now + n.t + n.d);
-            });
-        }
-
-        document.getElementById('start-btn').addEventListener('click', async () => {
-            initAudio(); playMelody(); 
-            document.getElementById('start-overlay').style.display = 'none';
-            initWeather(); fetchHKOWarning(); findBusStop(); shiftScreen(); window.wakeUp();
-            try { document.documentElement.requestFullscreen(); } catch(e){}
-        });
-
-        // ================= ALERTS =================
-        let alertState = { active: false, timer: null, cycleCount: 0, snoozeTimer: null };
-        onValue(ref(db, 'notification'), (snap) => {
-            if (isSystemPaused) return;
-            const data = snap.val();
-            if(data && data.status === 'unread') { if (!alertState.active) { window.wakeUp(); startAlertSequence(data.text); } } 
-            else { stopAlertSequence(); document.getElementById('alert-overlay').style.display = 'none'; }
-        });
-        function startAlertSequence(msg) { alertState.active = true; alertState.cycleCount = 0; document.getElementById('alert-text').innerText = msg; runAlertCycle(); }
-        function runAlertCycle() {
-            if (isSystemPaused || alertState.cycleCount >= 3) { stopAlertSequence(); return; }
-            const alertBox = document.getElementById('alert-overlay'); alertBox.style.display = 'flex';
-            document.getElementById('alert-status-text').innerText = `Attempt ${alertState.cycleCount + 1}/3`;
-            if (!alertState.timer) { playMelody(); alertState.timer = setInterval(playMelody, 9000); }
-            alertState.snoozeTimer = setTimeout(() => { clearInterval(alertState.timer); alertState.timer = null; alertBox.style.display = 'none'; alertState.cycleCount++; alertState.snoozeTimer = setTimeout(runAlertCycle, 5 * 60000); }, 60000);
-        }
-        function stopAlertSequence() { alertState.active = false; clearInterval(alertState.timer); alertState.timer = null; clearTimeout(alertState.snoozeTimer); }
-        window.confirmMsg = function() { update(ref(db, 'notification'), { status: 'read' }); window.wakeUp(); };
-        window.toggleFullScreen = function() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
-
-        // ================= DATA (Schedule/Tasks) =================
-        onValue(ref(db, 'schedule'), (snap) => { document.getElementById('schedule-text').innerText = (snap.val()||{})[new Date().toLocaleDateString('en-CA')] || "Free day."; });
-        onValue(ref(db, 'tasks'), (snap) => {
-            const list = document.getElementById('task-list'); list.innerHTML = "";
-            const tasks = snap.val() || {};
-            Object.keys(tasks).forEach(key => {
-                const t = tasks[key];
-                const li = document.createElement('li');
-                li.innerHTML = `<input type='checkbox' class='task-checkbox' ${t.done?'checked':''} onchange="toggleTask('${key}', this.checked)"><span class='${t.done?'task-done':''}'>${t.text}</span>`;
-                list.appendChild(li);
-            });
-        });
-        window.toggleTask = function(key, done) { update(ref(db, 'tasks/'+key), { done }); window.wakeUp(); };
-
-        // ================= WEATHER (HKO + Open-Meteo) =================
-        // 指定天文台氣象站名稱 (英文)
-        const HKO_STATION = "Sheung Shui"; 
-
-        async function fetchWeather() {
-            // 1. 抓取香港天文台即時天氣
-            try {
-                const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en');
-                const hkoData = await res.json();
-                
-                // 找尋上水溫度，若無則用天文台總部
-                const stationData = hkoData.temperature.data.find(s => s.place === HKO_STATION);
-                
-                let currentTemp = 0;
-                let activeStationName = "";
-
-                if (stationData) {
-                    currentTemp = stationData.value;
-                    activeStationName = "📍 " + HKO_STATION;
-                } else {
-                    currentTemp = hkoData.temperature.data[0].value;
-                    activeStationName = "📍 HKO Headquarters (Fallback)";
-                }
-
-                const currentHum = hkoData.humidity.data[0].value;
-                const hkoIconCode = hkoData.icon[0];
-
-                document.getElementById('w-temp').innerText = currentTemp;
-                document.getElementById('w-hum').innerText = currentHum + "%";
-                document.getElementById('w-icon').innerText = getHKOIcon(hkoIconCode);
-                
-                // 更新顯示的氣象站名稱
-                document.getElementById('w-station').innerText = activeStationName;
-
-                updateOutfit(currentTemp);
-
-            } catch(e) { 
-                console.error("HKO Fetch Error:", e); 
-                document.getElementById('w-station').innerText = "⚠️ Connection Error";
+        const I18N = {
+            'zh-HK': {
+                weather_title: '香港天氣', suggestion_title: '即時行動建議', schedule_title: '即將行程', todo_title: '待辦事項', bus_title: '巴士到站',
+                dtip_rain: '現正下雨，外出請務必帶備雨具。', dtip_heavy_rain: '暴雨警告生效中！請留在安全室內。', dtip_very_cold: '天氣嚴寒 (低於12°C)，請穿著厚羽絨及保暖衣物。', dtip_cold: '天氣寒冷 (12-17°C)，建議穿著厚外套或大衣。', dtip_cool: '天氣清涼 (18-23°C)，建議穿著薄外套或風衣。', dtip_warm: '天氣溫暖 (24-27°C)，穿著透氣衣物，舒適宜人。', dtip_hot: '天氣炎熱 (28-32°C)，請注意防曬及補充水分。', dtip_very_hot: '酷熱天氣 (33°C+)，請避免長時間戶外活動，慎防中暑。', dtip_humid: '相對濕度高 (>85%)，建議開啟抽濕機防止牆身出水。', dtip_dry: '天氣乾燥 (濕度<45%)，請多喝水及塗抹潤膚霜。', dtip_default: '天氣狀況良好，適合進行戶外活動。',
+                bus_no_data: '暫時沒有班次', bus_stop_not_found: '找不到符合的車站', bus_searching: '搜尋中...',
+                date_format: { weekday: 'short', year: 'numeric', month: 'numeric', day: 'numeric' },
+                holiday_none: '暫無公眾假期', holiday_none_en: 'No Public Holiday'
+            },
+            'en': {
+                weather_title: 'HK Weather', suggestion_title: 'Action Tips', schedule_title: 'Upcoming', todo_title: 'To-Do List', bus_title: 'Bus Arrivals',
+                dtip_rain: 'Raining. Bring Umbrella.', dtip_heavy_rain: 'Heavy Rain Warning!', dtip_very_cold: 'Very Cold (<12°C). Wear heavy coat.', dtip_cold: 'Cold (12-17°C). Wear coat.', dtip_cool: 'Cool (18-23°C). Wear jacket.', dtip_warm: 'Warm (24-27°C). Breathable wear.', dtip_hot: 'Hot (28-32°C). Sunscreen needed.', dtip_very_hot: 'Very Hot (33°C+). Avoid outdoors.', dtip_humid: 'Humid (>85%). Dehumidify.', dtip_dry: 'Dry (<45%). Moisturize.', dtip_default: 'Comfortable weather.',
+                bus_no_data: 'No Departures', bus_stop_not_found: 'Stop Not Found', bus_searching: 'Searching...',
+                date_format: { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' },
+                holiday_none: 'No Public Holiday', holiday_none_en: 'No Public Holiday'
             }
+        };
 
-            // 2. Open-Meteo (用於體感/預報/降雨機率) - 座標鎖定上水
-            try {
-                const url = `https://api.open-meteo.com/v1/forecast?latitude=22.50&longitude=114.12&current=apparent_temperature,wind_speed_10m&daily=precipitation_probability_max,temperature_2m_max,temperature_2m_min,weather_code&timezone=auto&forecast_days=4`;
-                const res = await fetch(url); const data = await res.json();
-                const cur = data.current; const daily = data.daily;
+        const HKO_STATIONS = [
+            { name: "香港天文台 (HQ)", lat: 22.3023, lon: 114.1742 }, { name: "上水 Sheung Shui", lat: 22.5019, lon: 114.1287 }, { name: "大埔 Tai Po", lat: 22.4460, lon: 114.1789 }, { name: "沙田 Sha Tin", lat: 22.4025, lon: 114.2100 }, { name: "屯門 Tuen Mun", lat: 22.3855, lon: 113.9642 }, { name: "將軍澳 Tseung Kwan O", lat: 22.3160, lon: 114.2494 }, { name: "西貢 Sai Kung", lat: 22.3836, lon: 114.2709 }, { name: "長洲 Cheung Chau", lat: 22.2011, lon: 114.0267 }, { name: "赤鱲角 Airport", lat: 22.3094, lon: 113.9220 }, { name: "啟德 Kai Tak", lat: 22.3072, lon: 114.2125 }, { name: "黃竹坑 Wong Chuk Hang", lat: 22.2479, lon: 114.1736 }
+        ];
 
-                document.getElementById('w-feels').innerText = Math.round(cur.apparent_temperature) + "°";
-                document.getElementById('w-wind').innerText = Math.round(cur.wind_speed_10m);
-                document.getElementById('w-rain').innerText = daily.precipitation_probability_max[0] + "%";
-                document.getElementById('w-max').innerText = "↑" + Math.round(daily.temperature_2m_max[0]) + "°";
-                document.getElementById('w-min').innerText = "↓" + Math.round(daily.temperature_2m_min[0]) + "°";
+        let APP_CONFIG = JSON.parse(localStorage.getItem('dash_config')) || DEFAULT_CONFIG;
+        let app, auth, db, appId;
+        try {
+            const config = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : LOCAL_FIREBASE_CONFIG;
+            if (config.apiKey === "YOUR_API_KEY") {
+                console.error("Firebase Config Missing");
+                document.getElementById('firebase-warning').classList.remove('hidden');
+            } else {
+                app = initializeApp(config); auth = getAuth(app); db = getFirestore(app);
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-local-app-id';
+            }
+        } catch (e) { console.error("Firebase Init Error", e); }
+        
+        const getCollection = (name) => db ? collection(db, 'artifacts', appId, 'public', 'data', name) : null;
 
-                const fContainer = document.getElementById('forecast-container'); fContainer.innerHTML = "";
-                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-                for (let i = 1; i <= 3; i++) {
-                    const d = new Date(daily.time[i]);
-                    const div = document.createElement('div'); div.className = "f-day";
-                    div.innerHTML = `<span class="fd-name">${days[d.getDay()]}</span><span class="fd-icon">${getOpenMeteoIcon(daily.weather_code[i])}</span><span class="fd-temp">${Math.round(daily.temperature_2m_max[i])}°</span>`;
-                    fContainer.appendChild(div);
-                }
-
-                const actionBox = document.getElementById('action-tip');
-                if (daily.precipitation_probability_max[0] >= 60) { actionBox.innerHTML = "☁️ Rain soon? Take in laundry!"; actionBox.style.display = "block"; } 
-                else { actionBox.style.display = "none"; }
-            } catch(e) { console.error("Forecast Error:", e); }
-        }
-
-        function updateOutfit(temp) {
-            let kTop="", kOuter="", kPants="", kExtra="", color = "#4CAF50"; 
-            if (temp <= 12) { color = "#34495e"; kTop = "Thermal"; kOuter = "Down Jkt"; kPants = "Fleece"; kExtra = "Scarf"; }
-            else if (temp <= 17) { color = "#2980b9"; kTop = "Long Tee"; kOuter = "Padded"; kPants = "Trousers"; kExtra = "Vest"; }
-            else if (temp <= 23) { color = "#27ae60"; kTop = "Cotton Tee"; kOuter = "Cardigan"; kPants = "Leggings"; kExtra = "Layering"; }
-            else if (temp <= 27) { color = "#f39c12"; kTop = "Short Slv"; kOuter = "Windbrk"; kPants = "Thin Pants"; kExtra = "Patch"; }
-            else { color = "#c0392b"; kTop = "Tank Top"; kOuter = "None"; kPants = "Shorts"; kExtra = "Water"; }
-            document.getElementById('k-top').innerText = kTop; document.getElementById('k-outer').innerText = kOuter;
-            document.getElementById('k-pants').innerText = kPants; document.getElementById('k-extra').innerText = kExtra;
-            document.getElementById('outfit-card').style.borderLeftColor = color;
-        }
-
-        function getHKOIcon(code) {
-            if (code >= 50 && code <= 54) return "☀️";
-            if (code >= 60 && code <= 65) return "🌧️";
-            if (code >= 70 && code <= 77) return "🌙";
-            if (code >= 80 && code <= 85) return "🍃";
-            if (code >= 90 && code <= 93) return "⛈️";
-            return "☁️";
-        }
-        function getOpenMeteoIcon(code) { 
-            if(code===0) return "☀️"; if(code<=3) return "⛅"; if(code<=48) return "🌫️"; 
-            if(code>=51 && code<=67) return "🌧️"; if(code>=71 && code<=86) return "🌨️"; if(code>=95) return "⛈️"; return "☁️"; 
-        }
-
-        async function fetchHKOWarning() {
-            try {
-                const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=en'); const data = await res.json();
-                const box = document.getElementById('hko-warning-box');
-                if (!data || Object.keys(data).length === 0) { box.style.display = 'none'; return; }
-                let wList = []; let isSevere = false;
-                Object.values(data).forEach(w => { wList.push(w.name); if (w.code.match(/RED|BLACK|TC8|TC9|TC10/)) isSevere = true; });
-                box.innerHTML = "⚠️ " + wList.join(" | "); box.className = isSevere ? 'warn-red' : ''; box.style.display = 'block';
-            } catch(e) {}
-        }
-
-        let targetStopSeq = null; 
-        async function findBusStop() {
-            const container = document.getElementById('bus-container'); 
-            try {
-                const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${config.busRoute}/outbound/1`);
-                const data = await res.json(); const stops = data.data; 
-                for (let i = 0; i < stops.length; i++) {
-                    const detail = await (await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stops[i].stop}`)).json();
-                    if (detail.data.name_tc.includes(config.busStopKey)) { targetStopSeq = stops[i].seq; fetchBusETA(); setInterval(fetchBusETA, 30000); return; }
-                }
-                container.innerHTML = "Stop Not Found";
-            } catch(e) { container.innerHTML = "Err: Invalid Route"; }
-        }
-        async function fetchBusETA() {
-            if (!targetStopSeq) return;
-            try {
-                const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${config.busRoute}/1`); const json = await res.json();
-                const buses = json.data.filter(b => parseInt(b.seq) === parseInt(targetStopSeq)).sort((a, b) => new Date(a.eta) - new Date(b.eta)).slice(0, 3); 
-                const container = document.getElementById('bus-container'); container.innerHTML = "";
-                buses.forEach((bus, index) => {
-                    if (!bus.eta) return;
-                    const diffMins = Math.floor((new Date(bus.eta) - new Date()) / 60000);
-                    if (diffMins < -1) return;
-                    const div = document.createElement('div'); div.className = "bus-row" + (index === 0 ? " first" : "");
-                    div.innerHTML = `<span class="br-time">${new Date(bus.eta).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span><span class="br-min">${(diffMins <= 0) ? "Arr" : diffMins + "m"}</span>`;
-                    container.appendChild(div);
+        /* --- 0. AUDIO MANAGER --- */
+        class AudioManager {
+            constructor() {
+                this.ctx = null;
+                this.isAlerting = false;
+                this.currentId = null;
+                this.cycleCount = 0;
+                this.timers = [];
+            }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === 'suspended') this.ctx.resume(); }
+            startAlert(id, text) { if (this.currentId === id && this.isAlerting) return; this.stop(); this.init(); this.currentId = id; this.isAlerting = true; this.cycleCount = 0; this.runCycle(text); }
+            runCycle(text) {
+                if (!this.isAlerting) return;
+                document.getElementById('alert-overlay').style.display = 'flex';
+                const cycleStartTime = Date.now();
+                const activeDuration = 60 * 1000;
+                const playLoop = () => {
+                    if (!this.isAlerting) return;
+                    if (Date.now() - cycleStartTime > activeDuration) {
+                        this.cycleCount++;
+                        if (this.cycleCount < 3) {
+                            document.getElementById('alert-overlay').style.display = 'none';
+                            const t = setTimeout(() => this.runCycle(text), 5 * 60 * 1000);
+                            this.timers.push(t);
+                        } else { this.stop(); document.getElementById('alert-overlay').style.display = 'none'; }
+                        return;
+                    }
+                    this.playMelody();
+                    const t_speak = setTimeout(() => this.speak(text), 6000);
+                    const t_next = setTimeout(playLoop, 15000);
+                    this.timers.push(t_speak, t_next);
+                };
+                playLoop();
+            }
+            playMelody() {
+                if (!this.ctx) this.init();
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                const now = this.ctx.currentTime;
+                const notes = [{ f: 739.99, t: 0.0, d: 2.5 }, { f: 587.33, t: 0.5, d: 2.5 }, { f: 440.00, t: 1.0, d: 2.5 }, { f: 587.33, t: 1.5, d: 2.5 }, { f: 659.25, t: 2.0, d: 2.5 }, { f: 880.00, t: 2.5, d: 3.5 }];
+                notes.forEach(n => {
+                    const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.type = 'sine'; osc.frequency.value = n.f;
+                    gain.gain.setValueAtTime(0, now + n.t);
+                    gain.gain.linearRampToValueAtTime(0.3, now + n.t + 0.03);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
+                    osc.start(now + n.t); osc.stop(now + n.t + n.d);
                 });
-            } catch(e) {}
+            }
+            speak(text) {
+                if (!window.speechSynthesis) return;
+                window.speechSynthesis.cancel();
+                const u = new SpeechSynthesisUtterance(text);
+                u.rate = 0.75;
+                const hasEnglish = /[a-zA-Z]/.test(text);
+                const targetLang = hasEnglish ? 'en-US' : 'zh-HK';
+                const voices = window.speechSynthesis.getVoices();
+                let v = null;
+                if (targetLang === 'zh-HK') {
+                    v = voices.find(voice => voice.lang === 'zh-HK');
+                    if (!v) v = voices.find(voice => (voice.name.toLowerCase().includes('cantonese') || voice.lang.includes('HK')) && !voice.name.toLowerCase().includes('mandarin') && !voice.lang.includes('zh-CN'));
+                } else { v = voices.find(voice => voice.lang.startsWith('en')); }
+                if (v) u.voice = v; u.lang = targetLang; window.speechSynthesis.speak(u);
+            }
+            stop() { this.isAlerting = false; this.currentId = null; this.cycleCount = 0; this.timers.forEach(t => clearTimeout(t)); this.timers = []; if (this.ctx) this.ctx.suspend(); if (window.speechSynthesis) window.speechSynthesis.cancel(); }
         }
-        function initWeather() { fetchWeather(); }
 
-        setInterval(fetchWeather, 300000); // 5 mins
-        setInterval(fetchHKOWarning, 600000); // 10 mins
-        updateClock();
+        /* --- NEW: HOLIDAY MANAGER --- */
+        class HolidayManager {
+            constructor() { this.checkHoliday(); setInterval(() => this.checkHoliday(), 3600000); } // Check every hour
+            async checkHoliday() {
+                const now = new Date();
+                const year = now.getFullYear();
+                const dateString = now.toISOString().split('T')[0];
+                const el = document.getElementById('holiday-status');
+                const lang = APP_CONFIG.lang || 'zh-HK';
+                
+                try {
+                    const res = await fetch(`https://date.nager.at/api/v3/PublicHolidays/${year}/HK`);
+                    const data = await res.json();
+                    const holiday = data.find(h => h.date === dateString);
+                    
+                    if (holiday) {
+                        const name = (lang === 'zh-HK') ? holiday.localName : holiday.name;
+                        el.textContent = `★ ${name}`;
+                        el.parentElement.classList.add('text-red-400');
+                        el.parentElement.classList.remove('text-yellow-400');
+                    } else {
+                        el.textContent = I18N[lang].holiday_none;
+                        el.parentElement.classList.add('text-yellow-400');
+                        el.parentElement.classList.remove('text-red-400');
+                    }
+                } catch(e) { 
+                    console.error("Holiday API Error", e);
+                    el.textContent = "..."; 
+                }
+            }
+        }
+
+        /* --- 1. SYSTEM MANAGER --- */
+        class SystemManager {
+            constructor() {
+                this.initClock(); this.initBurnIn(); this.initControls(); this.updateLanguage();
+                if(db) this.listenRemoteConfig();
+                document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.requestWakeLock(); });
+            }
+            listenRemoteConfig() {
+                const configRef = doc(getCollection('settings'), 'config');
+                onSnapshot(configRef, (doc) => {
+                    if (doc.exists()) {
+                        const remote = doc.data(); APP_CONFIG = { ...APP_CONFIG, ...remote };
+                        if (remote.busConfig && remote.busConfig.targetStopName !== APP_CONFIG.busConfig.targetStopName) { APP_CONFIG.busConfig.seq = null; APP_CONFIG.busConfig.dir = null; }
+                        localStorage.setItem('dash_config', JSON.stringify(APP_CONFIG)); this.updateLanguage();
+                        if(window.busMgr) window.busMgr.init(); if(window.weatherMgr) window.weatherMgr.locateAndFetch(); if(window.holidayMgr) window.holidayMgr.checkHoliday();
+                    }
+                });
+            }
+            async requestWakeLock() { try { await navigator.wakeLock.request('screen'); } catch (e) {} }
+            initControls() {
+                document.getElementById('lang-btn').onclick = () => {
+                    APP_CONFIG.lang = APP_CONFIG.lang === 'zh-HK' ? 'en' : 'zh-HK'; localStorage.setItem('dash_config', JSON.stringify(APP_CONFIG)); this.updateLanguage();
+                    window.weatherMgr?.generateAction(window.weatherMgr.lastTemp, window.weatherMgr.lastRain, window.weatherMgr.lastHum, APP_CONFIG.lang);
+                    window.busMgr?.fetchData(); window.holidayMgr?.checkHoliday();
+                };
+                document.getElementById('fullscreen-btn').onclick = () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else document.exitFullscreen(); };
+                document.getElementById('settings-btn').onclick = () => document.getElementById('settings-overlay').style.display = 'flex';
+                document.getElementById('close-settings').onclick = () => document.getElementById('settings-overlay').style.display = 'none';
+                document.getElementById('local-reset-btn').onclick = () => { localStorage.clear(); window.location.reload(); };
+            }
+            updateLanguage() {
+                const lang = APP_CONFIG.lang || 'zh-HK'; const dict = I18N[lang];
+                document.querySelectorAll('[data-i18n]').forEach(el => { const key = el.getAttribute('data-i18n'); if (dict[key]) el.textContent = dict[key]; });
+            }
+            initClock() {
+                setInterval(() => {
+                    const now = new Date(); document.getElementById('clock').textContent = now.toLocaleTimeString('en-GB', { hour12: false });
+                    const lang = APP_CONFIG.lang || 'zh-HK'; const locale = lang === 'zh-HK' ? 'zh-HK' : 'en-GB';
+                    document.getElementById('date').textContent = now.toLocaleDateString(locale, I18N[lang].date_format);
+                    const min = now.getHours() * 60 + now.getMinutes();
+                    const start = APP_CONFIG.sleepMode.startHour * 60 + APP_CONFIG.sleepMode.startMin;
+                    const end = APP_CONFIG.sleepMode.endHour * 60 + APP_CONFIG.sleepMode.endMin;
+                    let sleep = start < end ? (min >= start && min < end) : (min >= start || min < end);
+                    if (sleep) document.body.classList.add('deep-sleep'); else document.body.classList.remove('deep-sleep');
+                }, 1000);
+            }
+            initBurnIn() { setInterval(() => { const x = Math.floor(Math.random() * 6) - 3; const y = Math.floor(Math.random() * 6) - 3; document.getElementById('app-container').style.transform = `translate(${x}px, ${y}px)`; }, 300000); }
+        }
+
+        /* --- 2. BUS MANAGER --- */
+        class BusManager {
+            constructor() { this.init(); }
+            async init() {
+                this.config = APP_CONFIG.busConfig;
+                if (!this.config.seq || this.config.seq === null) { await this.scanRoute(); } else { this.fetchData(); }
+                if(this.timer) clearInterval(this.timer); this.timer = setInterval(() => this.fetchData(), 30000); 
+            }
+            async scanRoute() {
+                const { route, targetStopName } = this.config; const container = document.getElementById('bus-list'); const lang = APP_CONFIG.lang || 'zh-HK';
+                container.innerHTML = `<div class="text-center text-accent animate-pulse mt-10">${I18N[lang].bus_searching}</div>`;
+                document.getElementById('bus-route-title').textContent = route; document.getElementById('bus-stop-name-display').textContent = `...`;
+                try {
+                    const directions = ['outbound', 'inbound']; let found = false;
+                    for (const dir of directions) {
+                        if (found) break; const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${route}/${dir}/1`); const data = await res.json(); const stops = data.data;
+                        for (let i = 0; i < stops.length; i++) {
+                            const stopEntry = stops[i]; const detailRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${stopEntry.stop}`); const detail = await detailRes.json();
+                            const nameTC = detail.data.name_tc; const nameEN = detail.data.name_en; const key = targetStopName.toUpperCase();
+                            if (nameTC.includes(key) || nameEN.toUpperCase().includes(key)) {
+                                found = true; this.config.seq = stopEntry.seq; this.config.dir = (dir === 'outbound') ? 'O' : 'I'; this.config.foundName = (APP_CONFIG.lang === 'zh-HK') ? nameTC : nameEN;
+                                APP_CONFIG.busConfig = this.config; localStorage.setItem('dash_config', JSON.stringify(APP_CONFIG));
+                                document.getElementById('bus-status').textContent = "Locating Done"; this.fetchData(); break;
+                            }
+                        }
+                    }
+                    if (!found) container.innerHTML = `<div class="text-center text-red-400 mt-10">${I18N[lang].bus_stop_not_found}</div>`;
+                } catch(e) { container.innerHTML = `<div class="text-center text-red-400 mt-10">Scan Error</div>`; }
+            }
+            async fetchData() {
+                const { route, seq, dir, foundName } = this.config; if (!seq) return; 
+                const container = document.getElementById('bus-list'); const lang = APP_CONFIG.lang || 'zh-HK';
+                document.getElementById('bus-route-title').textContent = route; document.getElementById('bus-stop-name-display').textContent = foundName;
+                try {
+                    const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${route}/1`); const json = await res.json();
+                    const buses = json.data.filter(b => parseInt(b.seq) === parseInt(seq)).filter(b => b.dir === dir).filter(b => !!b.eta).sort((a, b) => new Date(a.eta) - new Date(b.eta)).slice(0, 3);
+                    container.innerHTML = "";
+                    if (buses.length === 0) { container.innerHTML = `<div class="text-center text-slate-500 mt-10">${I18N[lang].bus_no_data}</div>`; return; }
+                    buses.forEach((bus, index) => {
+                        const diffMins = Math.floor((new Date(bus.eta) - new Date()) / 60000); if (diffMins < -2) return; 
+                        const timeStr = new Date(bus.eta).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                        const div = document.createElement('div'); div.className = "flex justify-between items-center border-b border-slate-700 pb-2";
+                        div.innerHTML = `<div class="text-xl font-mono text-white">${timeStr}</div><div class="text-right"><span class="text-2xl ${diffMins <= 5 ? 'text-red-400 animate-pulse' : 'text-green-400'} font-mono font-bold">${diffMins <= 0 ? 'Arr' : diffMins + 'm'}</span></div>`;
+                        container.appendChild(div);
+                    });
+                } catch(e) { console.error("Bus Fetch Error", e); }
+            }
+        }
+
+        /* --- 3. WEATHER MANAGER --- */
+        class WeatherManager {
+            constructor() {
+                this.lastTemp = 25; this.lastRain = 0; this.lastHum = 70;
+                this.locateAndFetch(); setInterval(() => this.locateAndFetch(), 60000); 
+                window.weatherMgr = this;
+            }
+            locateAndFetch() {
+                const stationOverride = APP_CONFIG.weatherStation; document.getElementById('weather-desc').textContent = "Locating...";
+                
+                // Chrome Fallback
+                const fallback = () => {
+                    console.log("GPS Blocked/Unavailable, using HQ Fallback");
+                    this.fetchData(HKO_STATIONS[0]); 
+                };
+
+                if (stationOverride && stationOverride !== 'GPS') { 
+                    const st = HKO_STATIONS.find(s => s.name.includes(stationOverride)) || HKO_STATIONS[0]; 
+                    this.fetchData(st); return; 
+                }
+                
+                // 5s Timeout
+                const timeout = setTimeout(fallback, 5000);
+
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (pos) => { clearTimeout(timeout); this.fetchData(this.findNearestStation(pos.coords.latitude, pos.coords.longitude)); },
+                        (err) => { clearTimeout(timeout); fallback(); }
+                    );
+                } else { clearTimeout(timeout); fallback(); }
+            }
+            findNearestStation(lat, lon) {
+                let minDist = Infinity; let nearest = HKO_STATIONS[0];
+                HKO_STATIONS.forEach(st => {
+                    const R = 6371; const dLat = (st.lat - lat) * Math.PI / 180; const dLon = (st.lon - lon) * Math.PI / 180;
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat * Math.PI / 180) * Math.cos(st.lat * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); const d = R * c; if (d < minDist) { minDist = d; nearest = st; }
+                }); return nearest;
+            }
+            async fetchData(station) {
+                const lang = APP_CONFIG.lang || 'zh-HK'; const langParam = lang === 'zh-HK' ? 'tc' : 'en';
+                document.getElementById('weather-source').textContent = `${station.name}`; document.getElementById('weather-desc').textContent = "Loading...";
+                try {
+                    const res = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=${langParam}`); const data = await res.json();
+                    let tempVal = data.temperature.data[0].value; 
+                    const match = data.temperature.data.find(t => station.name.includes(t.place) || t.place.includes(station.name.split(' ')[0])); if (match) tempVal = match.value;
+                    this.lastTemp = tempVal; this.lastRain = data.rainfall.data[0]?.max || 0; this.lastHum = data.humidity.data[0].value;
+                    document.getElementById('temp').textContent = `${parseFloat(tempVal).toFixed(1)}°`; document.getElementById('humidity').textContent = `Hum: ${data.humidity.data[0].value}%`;
+                    document.getElementById('weather-desc').textContent = "";
+                    this.generateAction(this.lastTemp, this.lastRain, this.lastHum, lang);
+                    
+                    const wContainer = document.getElementById('inner-warning-container'); 
+                    wContainer.innerHTML = ''; // Clear container to prevent duplication
+                    
+                    const warnRes = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=en`); const warnData = await warnRes.json();
+                    
+                    // Set to track processed warning codes to prevent duplicates
+                    const processedCodes = new Set();
+
+                    if (warnData) {
+                        for (const [key, value] of Object.entries(warnData)) {
+                            if (value.actionCode && value.actionCode !== "CANCEL") {
+                                const code = value.code; 
+                                
+                                // Prevent duplicates
+                                if (processedCodes.has(code)) continue;
+                                processedCodes.add(code);
+
+                                if (code) {
+                                    const div = document.createElement('div');
+                                    let colorClass = "w-black"; 
+                                    if (code.includes('RED') || code.includes('FIREY') || code.includes('TC3')) colorClass = "w-amber";
+                                    if (code.includes('BLACK') || code.includes('FIRER') || code.includes('TC8') || code.includes('TC9') || code.includes('TC10')) colorClass = "w-red";
+                                    if (code.includes('COLD') || code.includes('FROST') || code.includes('TC1')) colorClass = "w-blue";
+                                    
+                                    div.className = `warning-item ${colorClass}`;
+                                    const name = (lang === 'zh-HK') ? value.name.replace('Signal', '信號').replace('Warning', '警告') : value.name; 
+                                    
+                                    // Use the stable text-only path for GIF icons with lowercase code
+                                    const iconUrl = `https://www.hko.gov.hk/textonly/v2/forecast/images_e/warning_icon_${code.toLowerCase()}.gif`;
+                                    
+                                    // With fallback text
+                                    div.innerHTML = `
+                                        <img src="${iconUrl}" class="warning-icon" onerror="this.style.display='none'">
+                                        <span>${name}</span>
+                                    `;
+                                    wContainer.appendChild(div);
+                                }
+                            }
+                        }
+                    }
+
+                    const fRes = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=${langParam}`); const fData = await fRes.json();
+                    const fGrid = document.getElementById('forecast-grid'); fGrid.innerHTML = '';
+                    if(fData.weatherForecast) fData.weatherForecast.slice(0, 3).forEach(day => {
+                        const dateStr = `${day.forecastDate.substring(4,6)}/${day.forecastDate.substring(6,8)}`;
+                        // Improved HTML generation for Forecast Grid using text clamping and smaller font
+                        fGrid.innerHTML += `
+                            <div class="flex flex-col items-center">
+                                <div class="text-slate-400 text-xs">${dateStr}</div>
+                                <div class="text-white font-bold text-lg my-0.5">${day.forecastMintemp.value}-${day.forecastMaxtemp.value}°</div>
+                                <div class="text-[10px] text-slate-500 leading-tight h-8 overflow-hidden flex items-center justify-center w-full px-1">
+                                    <span class="line-clamp-2">${day.forecastWeather}</span>
+                                </div>
+                            </div>`;
+                    });
+                } catch (e) { console.error(e); }
+            }
+            generateAction(temp, rain, hum, lang) {
+                if(temp === undefined) return; const dict = I18N[lang]; let tips = [];
+                if (rain > 30) tips.push(dict.dtip_heavy_rain); else if (rain > 0) tips.push(dict.dtip_rain);
+                if (temp < 12) tips.push(dict.dtip_very_cold); else if (temp < 18) tips.push(dict.dtip_cold); else if (temp < 24) tips.push(dict.dtip_cool); else if (temp < 28) tips.push(dict.dtip_warm); else if (temp < 33) tips.push(dict.dtip_hot); else tips.push(dict.dtip_very_hot);
+                if (hum > 85) tips.push(dict.dtip_humid); if (hum < 45) tips.push(dict.dtip_dry);
+                if (tips.length === 0 || (tips.length === 1 && tips[0] === dict.dtip_warm)) if(tips.length === 0) tips.push(dict.dtip_default);
+                document.getElementById('action-tip').innerHTML = tips.map(t => `<div class="mb-2 border-l-2 border-accent pl-2">${t}</div>`).join('');
+            }
+        }
+
+        async function initNews() {
+            try {
+                const res = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://rthk.hk/rthk/news/rss/c_expressnews_clocal.xml'); const data = await res.json();
+                if (data.items && data.items.length > 0) document.getElementById('news-ticker').innerHTML = data.items.map(i => `<span class="mr-12 inline-block">📰 ${i.title}</span>`).join('');
+            } catch (e) {}
+        }
+
+        class DataManager {
+            constructor() { if (auth) this.init(); }
+            async init() { if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token); else await signInAnonymously(auth); onAuthStateChanged(auth, u => { if(u && db) this.listen(); }); }
+            listen() {
+                onSnapshot(query(getCollection('schedules'), orderBy('timestamp', 'asc'), limit(5)), snap => {
+                    const schedPanel = document.getElementById('schedule-panel'); const todoPanel = document.getElementById('todo-panel'); const list = document.getElementById('schedule-list'); list.innerHTML = '';
+                    if (snap.empty) { schedPanel.classList.add('hidden'); schedPanel.classList.remove('flex'); todoPanel.classList.remove('h-1/2'); todoPanel.classList.add('h-full', 'flex-1'); } 
+                    else { schedPanel.classList.remove('hidden'); schedPanel.classList.add('flex'); todoPanel.classList.remove('h-full', 'flex-1'); todoPanel.classList.add('h-1/2'); snap.forEach(d => { const dat = d.data(); list.innerHTML += `<div class="flex gap-3 items-center"><div class="w-12 h-12 bg-slate-700 rounded-lg flex flex-col items-center justify-center text-xs font-bold text-accent"><span>${dat.time.split(':')[0]}</span><span>${dat.time.split(':')[1]}</span></div><div class="flex-1 bg-slate-700/30 p-2 rounded-lg border border-slate-700 truncate"><p class="text-sm font-bold text-white truncate">${dat.title}</p></div></div>`; }); }
+                });
+                onSnapshot(query(getCollection('todos'), orderBy('timestamp', 'desc')), snap => {
+                    const l = document.getElementById('todo-list'); l.innerHTML = '';
+                    snap.forEach(d => { const dat = d.data(); l.innerHTML += `<div class="flex items-center gap-3 p-3 rounded bg-slate-800/50 border border-slate-700 ${dat.completed?'opacity-50':''}"><div class="w-5 h-5 rounded border ${dat.completed?'bg-green-500':'border-slate-500'}"></div><span class="${dat.completed?'line-through':''} text-sm flex-1 truncate">${dat.task}</span></div>`; });
+                });
+                onSnapshot(query(getCollection('alerts'), where('active', '==', true)), snap => {
+                    if(!snap.empty) {
+                        const d = snap.docs[0]; document.getElementById('alert-overlay').style.display = 'flex'; document.getElementById('alert-message').textContent = d.data().message;
+                        if (window.audioMgr) window.audioMgr.startAlert(d.id, d.data().message);
+                        document.getElementById('ack-btn').onclick = () => { updateDoc(doc(getCollection('alerts'), d.id), {active:false}); document.getElementById('alert-overlay').style.display = 'none'; if (window.audioMgr) window.audioMgr.stop(); };
+                    } else { if (window.audioMgr && window.audioMgr.isAlerting) { window.audioMgr.stop(); document.getElementById('alert-overlay').style.display = 'none'; } }
+                });
+            }
+        }
+
+        document.getElementById('start-btn').onclick = () => {
+            document.getElementById('setup-overlay').style.display = 'none';
+            window.audioMgr = new AudioManager(); window.audioMgr.init(); window.holidayMgr = new HolidayManager();
+            new SystemManager(); new BusManager(); new WeatherManager(); new DataManager(); initNews(); lucide.createIcons();
+            document.documentElement.requestFullscreen().catch(()=>{});
+        };
+        lucide.createIcons();
     </script>
 </body>
 </html>
