@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- 區段1: 元資料和視窗設定 -->
+    <!-- 這個區段定義了頁面的字符集、視窗縮放、移動端兼容性，以及標題。 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Smart Home Dashboard V44</title>
+    <style>
+        /* 區段1: 根變量定義 */
+        /* 這個區段定義了顏色變量，如背景、文字、強調色等，用於主題一致性。 */
+        :root { 
+            --bg: #000; 
+            --card: #151515; 
+            --text: #fff; 
+            --accent: #4CAF50; 
+            --warn: #ff9800; 
+            --bus: #E83434; 
+            --action: #FF5252; 
+        }
+
+        /* 區段2: 全局樣式和body設定 */
+        /* 這個區段設定頁面整體樣式，包括背景、字體、邊距和過渡效果。 */
+        body {
+            background: var(--bg); color: var(--text); font-family: Roboto, "Segoe UI", sans-serif;
+            margin: 0; padding: 0; height: 100vh; width: 100vw; overflow: hidden;
+            user-select: none; position: relative; transition: background 0.5s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* 區段3: 頂部按鈕群組樣式 */
+        /* 這個區段定義右上角按鈕的定位、樣式和互動效果。 */
+        .top-btn-group { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; gap: 15px; }
+        .circle-btn { background: rgba(255, 255, 255, 0.2); color: #fff; border: 1px solid rgba(255,255,255,0.4); width: 45px; height: 45px; border-radius: 50%; font-size: 22px; cursor: pointer; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); transition: all 0.3s; }
+        .circle-btn:active { background: rgba(255,255,255,0.6); transform: scale(0.95); }
+
+        /* 區段4: Orbit 容器樣式 */
+        /* 這個區段處理主要內容的定位和過渡效果。 */
+        #orbit-wrapper { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; z-index: 1; opacity: 1; transition: opacity 1s ease; }
+        #orbit-container { width: 95vw; height: 95vh; transition: transform 2s ease-in-out; transform: translate(0, 0); }
+
+        /* 區段5: 網格佈局樣式 */
+        /* 這個區段定義主要內容的網格結構和卡片樣式。 */
+        .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 15px; height: 100%; }
+        .card { background: var(--card); border-radius: 16px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .col-main { display: flex; flex-direction: column; gap: 15px; height: 100%; }
+        .weather-card { flex: 1.5; display: flex; flex-direction: column; padding: 20px; }
+
+/* 區段6: 行動提示樣式 - 嵌入版 */
+#action-tip { 
+    display: none; 
+    position: relative;       /* 取消 absolute，唔再浮動 */
+    margin: 5px auto;         /* 上下留 5px 位，居中 */
+    width: 95%;               /* 佔據大部份闊度 */
+    background: rgba(255, 77, 77, 0.9); 
+    color: white; 
+    padding: 3px 0;           /* 稍微加厚少少方便睇 */
+    border-radius: 4px; 
+    font-weight: bold; 
+    font-size: 0.8em;         /* 字體唔使太細 */
+    overflow: hidden; 
+    white-space: nowrap; 
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.marquee {
+    display: inline-block;
+    padding-left: 100%;
+    animation: marquee 15s linear infinite; 
+}
+
+@keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-150%); } 
+}
+
+        /* 區段7: 時鐘和警告樣式 */
+        /* 這個區段處理時鐘頭部、警告圖標和暫停指示器的樣式。 */
+        .clock-header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid #333; padding-bottom: 5px; margin-bottom: 5px; position: relative; }
+        .clock-left { display: flex; align-items: flex-end; gap: 15px; }
+        .clock-time { font-size: 3em; font-weight: bold; line-height: 1; letter-spacing: -2px; }
+        .warning-container { display: flex; gap: 5px; height: 40px; align-items: center; margin-bottom: 2px; flex-wrap: wrap; }
+        .warning-icon { height: 35px; width: 35px; object-fit: contain; }
+        
+        /* 🌟 已更新為風格 3 (微發光警報) */
+        .warning-text-badge { 
+            display: inline-flex; 
+            align-items: center; 
+            background: #2c0b0e; /* 極暗嘅深紅色 */
+            border: 1px solid #5a1a21; /* 暗紅邊框 */
+            color: #ffcccc; /* 淡粉紅字，柔和唔刺眼 */
+            padding: 5px 10px; 
+            border-radius: 8px; 
+            font-size: 0.85em; 
+            font-weight: bold; 
+            white-space: nowrap; /* 確保文字唔會屈斷成兩行 */
+            box-shadow: 0 0 8px rgba(231, 76, 60, 0.3); /* 柔和嘅紅色外發光 */
+        }
+        
+        .clock-date { font-size: 1.1em; color: #aaa; text-align: right; }
+        #pause-indicator { display: none; position: absolute; top: 0; left: 160px; background: #d63031; color: white; padding: 4px 10px; border-radius: 4px; font-size: 0.9em; font-weight: bold; align-items: center; gap: 5px; box-shadow: 0 0 8px rgba(214, 48, 49, 0.6); }
+
+        /* 區段8: 天氣主要行樣式 */
+        /* 這個區段定義天氣溫度、圖標和範圍的顯示樣式。 */
+        .w-main-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; margin-bottom: 0px; }
+        .w-temp-big { font-size: 3.5em; font-weight: bold; line-height: 1; margin-left: -5px; letter-spacing: -3px; }
+        .w-icon-big { font-size: 2.5em; margin-right: 10px; }
+        .w-range-box { text-align: right; display: flex; flex-direction: column; justify-content: center; padding-right: 5px; }
+        .wr-high { font-size: 1.6em; color: #ff7675; font-weight: bold; }
+        .wr-low { font-size: 1.6em; color: #74b9ff; font-weight: bold; }
+        #w-station { text-align: right; color: #888; font-size: 0.85em; margin-bottom: 12px; font-style: italic; }
+        .w-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
+        .w-item { text-align: center; background: #222; border-radius: 6px; padding: 6px; }
+        .w-label { font-size: 0.7em; color: #888; display: block; }
+        .w-val { font-size: 1.1em; font-weight: bold; color: #ddd; }
+
+        /* 區段9: 預報行樣式 */
+        /* 這個區段定義未來幾天預報的顯示樣式。 */
+        .forecast-row { display: flex; gap: 8px; margin-top: auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; }
+        .f-day { flex: 1; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: space-between; }
+        .fd-name { font-size: 0.8em; color: #aaa; margin-bottom: 2px; text-transform: uppercase; }
+        .fd-icon { font-size: 1.5em; margin-bottom: 2px; }
+        .fd-temp { font-size: 1em; font-weight: bold; color: #fff; }
+
+        /* 區段10: 服裝卡片樣式 */
+        /* 這個區段定義兒童服裝建議的網格和內容樣式。 */
+        .outfit-card { flex: 1; background: #1a1a1a; border-left: 6px solid var(--accent); padding: 15px; display: flex; flex-direction: column; }
+        .outfit-header { font-size: 1.3em; font-weight: bold; color: #fff; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        .outfit-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 8px; flex: 1; overflow: hidden; }
+        .outfit-box { background: #252525; padding: 8px 12px; border-radius: 8px; display: flex; flex-direction: column; justify-content: center; }
+        .ob-title { color: #888; font-size: 0.75em; text-transform: uppercase; margin-bottom: 2px; }
+        .ob-content { font-size: 1.1em; color: #fff; line-height: 1.2; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* 區段11: 側邊欄樣式 */
+        /* 這個區段定義日程、任務和巴士資訊的垂直佈局和樣式。 */
+        .col-side { display: flex; flex-direction: column; gap: 15px; height: 100%; }
+        .schedule-box { flex: 0 0 auto; min-height: 15%; border-top: 4px solid #FFD700; transition: all 0.3s; }
+        .side-title { font-size: 1.1em; color: #aaa; font-weight: bold; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .schedule-content { font-size: 1.1em; color: #ddd; white-space: pre-wrap; line-height: 1.3; overflow-y: auto; }
+        .task-box { flex: 1; border-top: 4px solid var(--accent); min-height: 0; }
+        .task-title { font-size: 1.4em; color: var(--accent); padding-bottom: 8px; margin-bottom: 8px; font-weight: bold; border-bottom: 1px solid #333; }
+        .task-list { list-style: none; padding: 0; overflow-y: auto; margin: 0; height: 100%; }
+        .task-list li { padding: 10px 5px; border-bottom: 1px solid #333; display: flex; align-items: flex-start; font-size: 1.2em; }
+        .task-checkbox { width: 22px; height: 22px; margin-right: 12px; accent-color: var(--accent); margin-top: 2px; cursor: pointer; }
+        .task-done { text-decoration: line-through; color: #555; }
+
+        /* 區段12: 巴士資訊樣式 */
+        /* 這個區段定義巴士路線、時間和列表的樣式，包括首班車強調。 */
+        .bus-box { flex: 0 0 170px; border-top: 4px solid var(--bus); background: #1a1111; padding-bottom: 10px; }
+        .bus-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; height: 25px; }
+        .bus-badge { background: var(--bus); color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.9em; }
+        .bus-compact-list { display: flex; flex-direction: column; gap: 6px; height: 100%; overflow: hidden; }
+        .bus-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #2a1515; border-radius: 6px; height: 38px; box-sizing: border-box; }
+        .bus-row.first { background: #d63031; }
+        .bus-row.first * { color: white !important; font-weight: bold; }
+        .br-time { font-family: monospace; font-size: 1.3em; color: #eee; }
+        .br-min { font-size: 1em; color: #aaa; }
+
+        /* 區段13: 覆蓋層樣式 */
+        /* 這個區段定義起始、夜間和設定的覆蓋層樣式，包括動畫和佈局。 */
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #start-btn { font-size: 3em; padding: 30px 60px; border-radius: 20px; border: 4px solid var(--accent); background: black; color: var(--accent); cursor: pointer; font-weight: bold; }
+        #night-saver { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 1000; overflow: hidden; cursor: pointer; }
+        #ns-content { position: absolute; width: 300px; padding: 20px; text-align: center; color: #333; transition: all 1s ease; }
+        #ns-time { font-size: 6em; font-weight: bold; color: #222; font-family: monospace; }
+        body.night-mode #night-saver { display: block; }
+        body.night-mode #orbit-wrapper { opacity: 0; }
+        body.night-mode .top-btn-group { display: none; }
+        #settings-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(20,20,20,0.95); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(10px); }
+        .settings-box { background: #222; width: 500px; padding: 30px; border-radius: 16px; border: 1px solid #444; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .set-title { font-size: 1.8em; margin-bottom: 20px; border-bottom: 1px solid #444; padding-bottom: 10px; color: #fff; }
+        .set-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .set-label { font-size: 1.2em; color: #ccc; }
+        .set-input { background: #333; border: 1px solid #555; color: white; padding: 8px; border-radius: 6px; font-size: 1.1em; width: 150px; text-align: right; }
+        .set-select { width: 168px; }
+        .set-btn-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 30px; }
+        .set-btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 1.1em; cursor: pointer; font-weight: bold; }
+        .btn-save { background: var(--accent); color: white; }
+        .btn-cancel { background: #444; color: white; }
+ #alert-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(220, 20, 60, 0.98); z-index: 999; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        .alert-msg { font-size: 5em; font-weight: bold; margin-bottom: 60px; text-shadow: 2px 2px 0 #000; }
+        .btn-ok { font-size: 3em; padding: 25px 100px; border-radius: 60px; border: none; background: white; color: #D00; font-weight: bold; cursor: pointer; animation: pulse 1s infinite; }
+        .alert-status { font-size: 1.5em; color: #fff; margin-top: 20px; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+
+<body>
+    <!-- 區段1: 頂部按鈕群組 -->
+    <!-- 這個區段包含設定和全屏切換的圓形按鈕，固定在右上角。 -->
+    <div class="top-btn-group">
+        <button class="circle-btn" onclick="openSettings()">⚙️</button>
+        <button class="circle-btn" onclick="toggleFullScreen()">⛶</button>
+    </div>
+<!-- 區段2: 紅色警佈 -->
+   <div id="alert-overlay">
+        <div class="alert-msg" id="alert-text">Msg</div>
+        <button class="btn-ok" onclick="confirmMsg()">OK</button>
+        <div class="alert-status" id="alert-status-text"></div>
+    </div>
+    
+    <!-- 區段3: 起始覆蓋層 -->
+    <!-- 這個區段是初始畫面覆蓋，包含開始按鈕，用於啟動應用。 -->
+    <div id="start-overlay"><button id="start-btn">👆 CLICK TO START</button></div>
+    
+    <!-- 區段4: 夜間省電模式覆蓋層 -->
+    <!-- 這個區段處理夜間模式下的黑屏省電顯示，包含時間顯示並可點擊喚醒。 -->
+    <div id="night-saver" onclick="wakeUp()">
+        <div id="ns-content"><div id="ns-time">00:00</div></div>
+    </div>
+    
+    <!-- 區段5: 設定覆蓋層 -->
+    <!-- 這個區段是設定彈出視窗，包含各種配置選項如天氣站、夜間時間等。 -->
+    <div id="settings-overlay">
+        <div class="settings-box">
+            <div class="set-title">⚙️ Settings</div>
+            <div class="set-row">
+                <span class="set-label">Weather Station</span>
+                <select id="cfg-weather-station" class="set-input set-select">
+      <option value="Sheung Shui">上水 (Sheung Shui)</option>
+<option value="Hong Kong Observatory">天文台 (Hong Kong Observatory)</option>
+<option value="King's Park">京士柏 (King's Park)</option>
+<option value="Wong Chuk Hang">黃竹坑 (Wong Chuk Hang)</option>
+<option value="Ta Kwu Ling">打鼓嶺 (Ta Kwu Ling)</option>
+<option value="Tai Po">大埔 (Tai Po)</option>
+<option value="Sha Tin">沙田 (Sha Tin)</option>
+<option value="Tuen Mun">屯門 (Tuen Mun)</option>
+<option value="Tseung Kwan O">將軍澳 (Tseung Kwan O)</option>
+<option value="Sai Kung">西貢 (Sai Kung)</option>
+<option value="Cheung Chau">長洲 (Cheung Chau)</option>
+<option value="Chek Lap Kok">赤鱲角 (Chek Lap Kok)</option>
+<option value="Tsing Yi">青衣 (Tsing Yi)</option>
+<option value="Shek Kong">石崗 (Shek Kong)</option>
+<option value="Hong Kong Park">香港公園 (Hong Kong Park)</option>
+<option value="Shau Kei Wan">筲箕灣 (Shau Kei Wan)</option>
+<option value="Kowloon City">九龍城 (Kowloon City)</option>
+<option value="Happy Valley">跑馬地 (Happy Valley)</option>
+<option value="Wong Tai Sin">黃大仙 (Wong Tai Sin)</option>
+<option value="Stanley">赤柱 (Stanley)</option>
+<option value="Kwun Tong">觀塘 (Kwun Tong)</option>
+<option value="Sham Shui Po">深水埗 (Sham Shui Po)</option>
+<option value="Yuen Long Park">元朗公園 (Yuen Long Park)</option>
+<option value="Tai Mei Tuk">大美督 (Tai Mei Tuk)</option>
+                </select>
+            </div>
+            <div class="set-row"><span class="set-label">Night Start (Hr)</span><input type="number" id="cfg-night-start" class="set-input" min="0" max="23"></div>
+            <div class="set-row"><span class="set-label">Night End (Hr)</span><input type="number" id="cfg-night-end" class="set-input" min="0" max="23"></div>
+            <div class="set-row"><span class="set-label">Wake Time (Min)</span><input type="number" id="cfg-wake-mins" class="set-input" min="1" max="60"></div>
+            <div class="set-row"><span class="set-label">Bus Route</span><input type="text" id="cfg-bus-route" class="set-input"></div>
+            <div class="set-row"><span class="set-label">Stop Keyword</span><input type="text" id="cfg-bus-stop" class="set-input"></div>
+            <div class="set-btn-row">
+                <button class="set-btn btn-cancel" onclick="closeSettings()">Cancel</button>
+                <button class="set-btn btn-save" onclick="saveSettings()">Save & Reload</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 區段6: 主要內容容器 -->
+    <!-- 這個區段是儀表板的 Orbit 包裝器，包含天氣、服裝、日程、任務和巴士資訊的網格佈局。 -->
+    <div id="orbit-wrapper">
+        <div id="orbit-container">
+            <div class="grid">
+                <div class="col-main">
+                    <div class="card weather-card">
+                        <div class="clock-header">
+                            <div class="clock-left">
+                                <div class="clock-time" id="clock">00:00:00</div>
+                                <div id="warning-icons" class="warning-container"></div>
+                            </div>
+                            <div id="pause-indicator">🔕 PAUSED</div>
+                            <div class="clock-date" id="date">Loading...</div>
+                        </div>
+                       
+                        <div id="action-tip">...</div>
+                       
+                        <div class="w-main-row">
+                            <div style="display:flex; align-items:center;">
+                                <div class="w-icon-big" id="w-icon">☁️</div>
+                                <div class="w-temp-big"><span id="w-temp">--</span>°</div>
+                            </div>
+                            <div class="w-range-box">
+                                <div class="wr-high" id="w-max">--°</div>
+                                <div class="wr-low" id="w-min">--°</div>
+                            </div>
+                        </div>
+                       
+                        <div id="w-station">Locating...</div>
+                        <div class="w-grid">
+                            <div class="w-item"><span class="w-label">FEELS</span><span class="w-val" id="w-feels">--°</span></div>
+                            <div class="w-item"><span class="w-label">HUMID</span><span class="w-val" id="w-hum">--%</span></div>
+                            <div class="w-item"><span class="w-label">WIND</span><span class="w-val" id="w-wind">--</span></div>
+                            <div class="w-item"><span class="w-label">RAIN</span><span class="w-val" id="w-rain">--%</span></div>
+                        </div>
+                        <div class="forecast-row" id="forecast-container"></div>
+                    </div>
+                    <div class="card outfit-card" id="outfit-card">
+                        <div class="outfit-header"><span>👶 Kid's Outfit</span></div>
+                        <div class="outfit-grid">
+                            <div class="outfit-box"><span class="ob-title">👕 Top</span><div class="ob-content" id="k-top">...</div></div>
+                            <div class="outfit-box"><span class="ob-title">🧥 Outer</span><div class="ob-content" id="k-outer">...</div></div>
+                            <div class="outfit-box"><span class="ob-title">👖 Bottom</span><div class="ob-content" id="k-pants">...</div></div>
+                            <div class="outfit-box"><span class="ob-title">🎒 Extra</span><div class="ob-content" id="k-extra">...</div></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-side">
+                    <div class="card schedule-box" id="schedule-box">
+                        <div class="side-title">📅 Schedule</div>
+                        <div class="schedule-content" id="schedule-text">Loading...</div>
+                    </div>
+                    <div class="card task-box">
+                        <div class="task-title">✅ To-Do List</div>
+                        <ul class="task-list" id="task-list"></ul>
+                    </div>
+                    <div class="card bus-box">
+                        <div class="bus-header-row">
+                            <span class="bus-badge" id="bus-badge">...</span>
+                            <span style="font-size:0.8em;color:#888;" id="bus-name">...</span>
+                        </div>
+                        <div id="bus-container" class="bus-compact-list">
+                            <div style="text-align:center; color:#666; padding:10px;">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        // 區段1: Firebase 模塊導入
+        // 這個區段從CDN導入Firebase的應用和數據庫模塊，用於實時數據同步。
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // 區段2: 配置變量和載入
+        // 這個區段定義默認配置，並從localStorage載入自訂設定，同時更新UI元素。
+        let config = { nightStart: 0, nightEnd: 6, wakeMins: 5, busRoute: "273B", busStopKey: "御景峰" };
+        function loadConfig() {
+            const stored = localStorage.getItem('sh_config_v40');
+            if(stored) { try { config = {...config, ...JSON.parse(stored)}; } catch(e){} }
+            const set = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+            set('cfg-night-start', config.nightStart); set('cfg-night-end', config.nightEnd);
+            set('cfg-wake-mins', config.wakeMins); set('cfg-bus-route', config.busRoute); set('cfg-bus-stop', config.busStopKey);
+            document.getElementById('bus-badge').innerText = config.busRoute;
+            document.getElementById('bus-name').innerText = config.busStopKey;
+        }
+        loadConfig();
+
+        // 區段3: 設定相關函數
+        // 這個區段定義開啟/關閉設定視窗和儲存設定的函數，包括重新載入頁面。
+        window.openSettings = function() { document.getElementById('settings-overlay').style.display = 'flex'; }
+        window.closeSettings = function() { document.getElementById('settings-overlay').style.display = 'none'; }
+        window.saveSettings = function() {
+            config.weatherStation = document.getElementById('cfg-weather-station').value;
+            config.nightStart = parseInt(document.getElementById('cfg-night-start').value);
+            config.nightEnd = parseInt(document.getElementById('cfg-night-end').value);
+            config.wakeMins = parseInt(document.getElementById('cfg-wake-mins').value);
+            config.busRoute = document.getElementById('cfg-bus-route').value;
+            config.busStopKey = document.getElementById('cfg-bus-stop').value;
+            localStorage.setItem('sh_config_v40', JSON.stringify(config));
+            location.reload();
+        }
+
+        // 區段4: Firebase 配置和初始化
+        // 這個區段定義Firebase的連接參數並初始化應用和數據庫。
+        const firebaseConfig = {
+          apiKey: "AIzaSyBEEE8jshpb46aPielTdruC65bqRDto4Cw",
+          authDomain: "my-home-dashboard-63da3.firebaseapp.com",
+          databaseURL: "https://my-home-dashboard-63da3-default-rtdb.firebaseio.com",
+          projectId: "my-home-dashboard-63da3",
+          storageBucket: "my-home-dashboard-63da3.firebasestorage.app",
+          messagingSenderId: "1088397829512",
+          appId: "1:1088397829512:web:25370367a4dee3e807463d",
+          measurementId: "G-T51ED3F8ZB"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // 區段5: 系統邏輯和暫停處理
+        // 這個區段監聽系統暫停狀態，並更新UI指示器。
+  let isSystemPaused = false;
+        onValue(ref(db, 'system/pause'), (snap) => {
+            isSystemPaused = snap.val() === true;
+            const indicator = document.getElementById('pause-indicator');
+            if (isSystemPaused) { 
+                indicator.style.display = 'flex'; 
+                // 系統暫停時，停止警報並隱藏
+                if (typeof stopAlertSequence === 'function') stopAlertSequence(); 
+                const overlay = document.getElementById('alert-overlay');
+overlay.innerText = message;
+    overlay.style.display = 'flex';
+playMelody();        // 播放你原本的旋律
+    speakAlertContent(); // 讀出裡面的文字
+                if (overlay) overlay.style.display = 'none'; 
+            } else { 
+                indicator.style.display = 'none'; 
+            }
+        });
+
+        // 區段6: 喚醒和夜間模式邏輯
+        // 這個區段處理喚醒計時、畫面移動（防燒屏）和夜間模式切換。
+        let wakeExpiryTime = 0;
+        window.wakeUp = function() { wakeExpiryTime = Date.now() + (config.wakeMins * 60 * 1000); updateClock(); }
+        document.body.addEventListener('click', () => { window.wakeUp(); });
+        document.body.addEventListener('touchstart', () => { window.wakeUp(); });
+        function shiftScreen() {
+            if (document.body.classList.contains('night-mode')) return;
+            const container = document.getElementById('orbit-container');
+            const range = 2.0;
+            container.style.transform = `translate(${(Math.random()*range*2)-range}vw, ${(Math.random()*range*2)-range}vh)`;
+        }
+        setInterval(shiftScreen, 5 * 60 * 1000);
+        function moveNightSaver() {
+            if (!document.body.classList.contains('night-mode')) return;
+            const content = document.getElementById('ns-content');
+            content.style.top = (Math.floor(Math.random() * 80) + 5) + "%";
+            content.style.left = (Math.floor(Math.random() * 80) + 5) + "%";
+        }
+        setInterval(moveNightSaver, 60000);
+        function updateClock() {
+            const now = new Date();
+            const h = now.getHours(); const m = String(now.getMinutes()).padStart(2,'0');
+            const timeStr = `${h}:${m}`;
+            document.getElementById('clock').innerText = timeStr;
+            document.getElementById('ns-time').innerText = timeStr;
+            document.getElementById('date').innerText = now.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+           
+            const isNightWindow = (h >= config.nightStart && h < config.nightEnd);
+            const isAwake = Date.now() < wakeExpiryTime;
+            if (isNightWindow) {
+                if (isAwake) { document.body.classList.remove('night-mode'); }
+                else { if (!document.body.classList.contains('night-mode')) { document.body.classList.add('night-mode'); moveNightSaver(); } }
+            } else { document.body.classList.remove('night-mode'); }
+        }
+        setInterval(updateClock, 1000);
+
+        // 區段7: 音頻初始化和播放
+        // 這個區段初始化Web Audio API並定義播放旋律的函數，用於警報。
+        let audioCtx;
+        function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+        function playMelody() {
+            if (!audioCtx) initAudio(); if (audioCtx.state === 'suspended') audioCtx.resume();
+            const now = audioCtx.currentTime;
+            const notes = [{ f: 739.99, t: 0.0, d: 2.5 }, { f: 587.33, t: 0.5, d: 2.5 }, { f: 440.00, t: 1.0, d: 2.5 }, { f: 587.33, t: 1.5, d: 2.5 }, { f: 659.25, t: 2.0, d: 2.5 }, { f: 880.00, t: 2.5, d: 3.5 }];
+            notes.forEach(n => {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.type = 'sine'; osc.frequency.value = n.f;
+                gain.gain.setValueAtTime(0, now + n.t); gain.gain.linearRampToValueAtTime(0.3, now + n.t + 0.03); gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
+                osc.start(now + n.t); osc.stop(now + n.t + n.d);
+            });
+        }
+ 
+// 區段8: 音頻初始化和播放
+function speakAlertContent() {
+    // 1. 抓取 overlay 裡面的文字內容
+    const alertElement = document.getElementById('alert-overlay');
+    if (!alertElement) return;
+    
+    const text = alertElement.innerText.trim();
+    if (!text) return;
+
+    // 2. 判斷語言邏輯 (簡單檢查是否包含中文字符)
+    // 正則表達式：[\u4E00-\u9FFF] 用於匹配漢字
+    const hasChinese = /[\u4E00-\u9FFF]/.test(text);
+    const lang = hasChinese ? 'zh-HK' : 'en-US';
+
+    // 3. 執行語音合成
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    utterance.rate = 1.0;  // 語速
+    utterance.pitch = 1.0; // 音調
+    
+    // 如果你想在說話前先停止之前的語音，可以解除下面這行的註釋：
+    // window.speechSynthesis.cancel(); 
+    
+    window.speechSynthesis.speak(utterance);
+}
+
+        // 區段9: 起始按鈕事件
+        // 這個區段處理起始按鈕點擊，初始化音頻、隱藏覆蓋層並啟動各種功能。
+      document.getElementById('start-btn').addEventListener('click', async () => {
+            initAudio(); 
+            playMelody(); // 測試音效
+            document.getElementById('start-overlay').style.display = 'none';
+            initWeather(); 
+            fetchHKOWarning(); 
+            findBusStop(); 
+            shiftScreen();
+            window.wakeUp();
+            // 嘗試進入全螢幕
+            try { document.documentElement.requestFullscreen(); } catch(e){}
+        });
+
+        // 區段10: 警報邏輯
+        // 這個區段監聽通知並處理警報序列，包括播放音頻和循環嘗試。
+      let alertState = { active: false, timer: null, cycleCount: 0, snoozeTimer: null };
+        
+        onValue(ref(db, 'notification'), (snap) => {
+            if (isSystemPaused) return; // 如果系統暫停，忽略通知
+
+            const data = snap.val();
+            const alertBox = document.getElementById('alert-overlay');
+            
+            if(data && data.status === 'unread') {
+                if (!alertState.active) { 
+                    window.wakeUp(); 
+                    startAlertSequence(data.text); 
+                }
+            } else {
+                stopAlertSequence(); 
+                alertBox.style.display = 'none';
+            }
+        });
+
+        function startAlertSequence(msg) {
+            alertState.active = true; 
+            alertState.cycleCount = 0;
+            document.getElementById('alert-text').innerText = msg; 
+            runAlertCycle();
+        }
+
+        function runAlertCycle() {
+            if (isSystemPaused) return; 
+            if (alertState.cycleCount >= 3) { stopAlertSequence(); return; } // 最多響 3 次循環
+
+            const alertBox = document.getElementById('alert-overlay');
+            alertBox.style.display = 'flex';
+            document.getElementById('alert-status-text').innerText = `Attempt ${alertState.cycleCount + 1}/3`;
+            
+            if (!alertState.timer) { 
+                playMelody(); 
+                alertState.timer = setInterval(playMelody, 9000); 
+            }
+
+            // 1分鐘後自動靜音 (Snooze)，5分鐘後重響
+            alertState.snoozeTimer = setTimeout(() => {
+                clearInterval(alertState.timer); alertState.timer = null;
+                alertBox.style.display = 'none'; 
+                alertState.cycleCount++;
+                alertState.snoozeTimer = setTimeout(runAlertCycle, 5 * 60000);
+            }, 60000);
+        }
+
+        function stopAlertSequence() {
+            alertState.active = false; 
+            clearInterval(alertState.timer); alertState.timer = null; 
+            clearTimeout(alertState.snoozeTimer);
+        }
+
+        window.confirmMsg = function() { 
+            update(ref(db, 'notification'), { status: 'read' }); 
+            window.wakeUp(); 
+        };
+        
+        window.toggleFullScreen = function() { 
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen(); 
+            else document.exitFullscreen(); 
+        };
+
+        // 區段11: 其他全域函數
+        // 這個區段定義確認消息和全屏切換的函數。
+       window.confirmMsg = function() { 
+            update(ref(db, 'notification'), { status: 'read' }); 
+            window.wakeUp(); 
+        };
+        window.toggleFullScreen = function() { 
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen(); 
+            else document.exitFullscreen(); 
+        };
+
+        // 區段12: 數據監聽（日程和任務）
+        // 這個區段從Firebase監聽日程和任務數據，並更新UI。
+        onValue(ref(db, 'schedule'), (snap) => { document.getElementById('schedule-text').innerText = (snap.val()||{})[new Date().toLocaleDateString('en-CA')] || "Free day."; });
+        onValue(ref(db, 'tasks'), (snap) => {
+            const list = document.getElementById('task-list'); list.innerHTML = "";
+            const tasks = snap.val() || {};
+            Object.keys(tasks).forEach(key => {
+                const t = tasks[key];
+                const li = document.createElement('li');
+                li.innerHTML = `<input type='checkbox' class='task-checkbox' ${t.done?'checked':''} onchange="toggleTask('${key}', this.checked)"><span class='${t.done?'task-done':''}'>${t.text}</span>`;
+                list.appendChild(li);
+            });
+        });
+        window.toggleTask = function(key, done) { update(ref(db, 'tasks/'+key), { done }); window.wakeUp(); };
+
+// 區段13: 天氣和預報邏輯 - 完整整合版
+function formatTime(date) {
+    return String(date.getHours()).padStart(2, '0') + ":" + String(date.getMinutes()).padStart(2, '0');
+}
+
+async function fetchWeather() {
+    try {
+        // ==========================================
+        // 1. 獲取 HKO 實時天氣 (溫度、濕度、圖標)
+        // ==========================================
+        const res = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en');
+        const hkoData = await res.json();
+
+        const stationMap = {
+            "上水": "Sheung Shui", "天文台": "Hong Kong Observatory", "京士柏": "King's Park",
+            "黃竹坑": "Wong Chuk Hang", "打鼓嶺": "Ta Kwu Ling", "大埔": "Tai Po",
+            "沙田": "Sha Tin", "屯門": "Tuen Mun", "將軍澳": "Tseung Kwan O",
+            "西貢": "Sai Kung", "長洲": "Cheung Chau", "赤鱲角": "Chek Lap Kok",
+            "青衣": "Tsing Yi", "石崗": "Shek Kong", "香港公園": "Hong Kong Park",
+            "筲箕灣": "Shau Kei Wan", "九龍城": "Kowloon City", "跑馬地": "Happy Valley",
+            "黃大仙": "Wong Tai Sin", "赤柱": "Stanley", "觀塘": "Kwun Tong",
+            "深水埗": "Sham Shui Po", "元朗公園": "Yuen Long Park", "大美督": "Tai Mei Tuk"
+        };
+
+        let targetStation = (config.weatherStation || "Hong Kong Observatory").trim();
+        if (stationMap[targetStation]) targetStation = stationMap[targetStation];
+
+        let stationData = hkoData.temperature.data.find(s => s.place.toLowerCase() === targetStation.toLowerCase());
+        if (!stationData) stationData = hkoData.temperature.data.find(s => s.place === "Hong Kong Observatory") || hkoData.temperature.data[0];
+
+        // 更新 UI 實時數據
+        const currentTemp = parseFloat(stationData.value);
+        const hkoIconCode = hkoData.icon?.[0] || 50;
+
+        if (document.getElementById('w-temp')) document.getElementById('w-temp').innerText = currentTemp;
+        if (document.getElementById('w-hum')) document.getElementById('w-hum').innerText = (hkoData.humidity?.data?.[0]?.value || "--") + "%";
+        if (document.getElementById('w-icon')) document.getElementById('w-icon').innerText = getHKOIcon(hkoIconCode);
+        if (document.getElementById('w-station')) {
+            document.getElementById('w-station').innerText = `📍 ${stationData.place} | 🕒 ${formatTime(new Date())}`;
+        }
+
+        // ==========================================
+        // 2. 獲取 Open-Meteo 補充數據 (降雨預測 & 體感)
+        // ==========================================
+        const lat = config.latitude || 22.3;
+        const lon = config.longitude || 114.1;
+        const omRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=apparent_temperature,wind_speed_10m&hourly=precipitation_probability&timezone=auto&forecast_hours=4`);
+        const omData = await omRes.json();
+
+        const maxRainProb = Math.max(...(omData.hourly?.precipitation_probability || [0]));
+        if (document.getElementById('w-rain')) document.getElementById('w-rain').innerText = maxRainProb + "%";
+        if (document.getElementById('w-feels')) document.getElementById('w-feels').innerText = omData.current.apparent_temperature.toFixed(1) + "°";
+
+        // ==========================================
+        // 3. 觸發服裝建議 (Outfit Update)
+        // ==========================================
+        // 判斷是否下雨：降雨概率 > 50% 或 天文台圖標顯示下雨(60-65)或雷暴(90-93)
+        const isRainingNow = (maxRainProb >= 50) || (hkoIconCode >= 60 && hkoIconCode <= 65) || (hkoIconCode >= 90 && hkoIconCode <= 93);
+        
+        if (typeof updateOutfit === 'function') {
+            updateOutfit(currentTemp, isRainingNow);
+        }
+
+        // --- 降雨專屬走馬燈顯示 ---
+        const actionBox = document.getElementById('action-tip');
+        if (actionBox) {
+            if (!actionBox.innerHTML.includes('🚨') && maxRainProb >= 50) {
+                const spacer = "&nbsp;".repeat(15);
+                actionBox.innerHTML = `<div class="marquee">🌧️ 未來預計有雨！請收衫 / Rain Soon!${spacer}</div>`;
+                actionBox.style.display = "block";
+                actionBox.style.background = "var(--action)"; 
+                actionBox.classList.remove("flash-bg");
+            } else if (!actionBox.innerHTML.includes('🚨')) {
+                // 如果既冇警告又冇雨，就隱藏
+                actionBox.style.display = "none";
+            }
+        }
+
+        // ==========================================
+        // 4. 獲取 HKO 九天天氣預報
+        // ==========================================
+        const fndRes = await fetch('https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=fnd&lang=en');
+        const fndData = await fndRes.json();
+        const forecast = fndData?.weatherForecast;
+
+        if (forecast && forecast.length > 0) {
+            const maxEl = document.getElementById('w-max');
+            const minEl = document.getElementById('w-min');
+            if (maxEl) maxEl.innerText = "↑" + forecast[0].forecastMaxtemp.value + "°";
+            if (minEl) minEl.innerText = "↓" + forecast[0].forecastMintemp.value + "°";
+
+            const fContainer = document.getElementById('forecast-container');
+            if (fContainer) {
+                fContainer.innerHTML = "";
+                const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+                const now = new Date();
+                const todayStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+                let startIndex = (forecast[0].forecastDate > todayStr) ? 0 : 1;
+
+                for (let i = startIndex; i < startIndex + 3; i++) {
+                    if (!forecast[i]) break;
+                    const f = forecast[i];
+                    const d = new Date(parseInt(f.forecastDate.substring(0, 4)), parseInt(f.forecastDate.substring(4, 6)) - 1, parseInt(f.forecastDate.substring(6, 8)));
+
+                    const div = document.createElement('div');
+                    div.className = "f-day";
+                    div.innerHTML = `
+                        <span class="fd-name">${days[d.getDay()]}</span>
+                        <div class="fd-condition">
+                            <span class="fd-icon">${getHKOIcon(f.ForecastIcon || f.forecastIcon)}</span>
+                            <span class="fd-temp">${f.forecastMaxtemp?.value || "--"}°</span>
+                        </div>`;
+                    fContainer.appendChild(div);
+                }
+            }
+        }
+    } catch (e) { 
+        console.error("Total Weather Update Error:", e); 
+    }
+}
+
+     // 區段14: HKO 警告獲取 (精簡版)
+const warnBadgeMap = {
+    'WFIREY': '🟨🔥 Yellow Fire',
+    'WFIRER': '🟥🔥 Red Fire',
+    'WRAINA': '🟡🌧️ Amber Rain',
+    'WRAINR': '🔴🌧️ Red Rain',
+    'WRAINB': '⚫🌧️ Black Rain',
+    'TC1': '🌀1️⃣ T1',
+    'TC3': '🌀3️⃣ T3',
+    'TC8NE': '🌀8️⃣ T8 (NE)',
+    'TC8SE': '🌀8️⃣ T8 (SE)',
+    'TC8NW': '🌀8️⃣ T8 (NW)',
+    'TC8SW': '🌀8️⃣ T8 (SW)',
+    'TC9': '🌀9️⃣ T9',
+    'TC10': '🌀🔟 T10',
+    'WTS': '⚡⛈️ Thunderstorm',
+    'WL': '⛰️⚠️ Landslip',
+    'WFROST': '🧊❄️ Frost',
+    'WHOT': '🥵☀️ Very Hot',
+    'WCOLD': '🥶❄️ Cold',
+    'WMSGNL': '💨⚫ Monsoon',
+    'WFNTSA': '🌊⚠️ NT Flooding',
+    'WTSUNAMI': '🌊⚠️ Tsunami' // 補一個海嘯防護
+};
+
+async function fetchHKOWarning() {
+    try {
+        // 加入 t=${Date.now()} 確保每次抓的都是最新資料，不被瀏覽器快存影響
+        const res = await fetch(`https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=en&t=${Date.now()}`);
+        const data = await res.json();
+        
+        const container = document.getElementById('warning-icons');
+        if (!container) return; 
+        
+        container.innerHTML = "";
+        
+        // 檢查 data 是否為空物件
+        if (!data || Object.keys(data).length === 0) {
+            // container.innerHTML = "<span>✅ No Warnings</span>"; // 選填：沒警告時顯示綠色勾勾
+            return;
+        }
+        
+        // 遍歷所有警告代碼
+        Object.keys(data).forEach(key => {
+            const warningInfo = data[key];
+            const code = warningInfo.code;
+            
+            const badge = document.createElement('span');
+            badge.className = 'warning-text-badge';
+            
+            // 邏輯：優先找字典，找不到則顯示 API 提供的 name
+            badge.innerText = warnBadgeMap[code] || `⚠️ ${warningInfo.name || 'Warning'}`;
+            
+            container.appendChild(badge);
+        });
+    } catch(e) { 
+        console.error("HKO Warning Error:", e); 
+    }
+}
+
+    // 區段15: 服裝更新和天氣圖標函數
+// 這個區段根據溫度更新服裝建議，並定義天氣圖標映射。
+// 加入了 isRaining 參數 (true 代表有雨，false 代表無雨)
+function updateOutfit(temp, isRaining) {
+    let kTop = "", kOuter = "", kPants = "", kExtra = "", color = "#4CAF50";
+
+    if (temp <= 12) { 
+        // 嚴寒濕冷 (12度或以下)
+        color = "#34495e"; 
+        kTop = "👕 Heattech + 厚衛衣/冷衫"; 
+        kOuter = "🧥 Down Jacket / 防風厚褸"; 
+        kPants = "👖 Thick Pants / 厚長褲"; 
+        kExtra = "🧣 Scarf & Gloves / 注意保暖"; 
+    }
+    else if (temp <= 17) { 
+        // 清涼微冷 (13-17度)
+        color = "#2980b9"; 
+        kTop = "👕 Long-sleeve / 薄衛衣"; 
+        kOuter = "🧥 Coat / 夾棉外套"; 
+        kPants = "👖 Jeans / 牛仔褲"; 
+        kExtra = "🧅 Layering / 洋蔥式穿搭"; 
+    }
+    else if (temp <= 23) { 
+        // 舒適秋涼 (18-23度)
+        color = "#27ae60"; 
+        kTop = "👕 T-shirt / 短袖或薄長袖"; 
+        kOuter = "🧥 Light Jacket / 薄外套"; 
+        kPants = "👖 Casual Pants / 舒適長褲"; 
+        // 這裡原本有縮骨遮建議，但下面有統一的落雨判斷，所以改成其他的
+        kExtra = "👟 Comfortable Shoes / 適合行街"; 
+    }
+    else if (temp <= 27) { 
+        // 炎熱 + 變態冷氣 (24-27度)
+        color = "#f39c12"; 
+        kTop = "👕 T-shirt / 短袖排汗衫"; 
+        kOuter = "❄️ AC Jacket / 必備冷氣褸"; 
+        kPants = "🩳 Light Pants / 輕薄長褲"; 
+        kExtra = "💦 Wipes / 止汗濕紙巾"; 
+    }
+    else { 
+        // 酷熱焗促 (28度以上)
+        color = "#c0392b"; 
+        kTop = "🎽 Vest / 透氣短袖背心"; 
+        kOuter = "☀️ UV Shirt / 防曬冷氣褸"; 
+        kPants = "🩳 Shorts / 短褲短裙"; 
+        kExtra = "🪭 Portable Fan / 帶芭蕉扇"; 
+    }
+
+    // 🌧️ 新增：如果預報有雨，直接覆蓋 Extra 提示為「記得帶遮 ☔」
+    if (isRaining) {
+        kExtra = "☔ Umbrella / 記得帶遮"; 
+    }
+
+    // 將結果更新到 HTML 畫面上
+    const elTop = document.getElementById('k-top');
+    const elOuter = document.getElementById('k-outer');
+    const elPants = document.getElementById('k-pants');
+    const elExtra = document.getElementById('k-extra');
+    const elCard = document.getElementById('outfit-card');
+
+    if (elTop) elTop.innerText = kTop; 
+    if (elOuter) elOuter.innerText = kOuter;
+    if (elPants) elPants.innerText = kPants; 
+    if (elExtra) elExtra.innerText = kExtra;
+    if (elCard) elCard.style.borderLeftColor = color;
+}
+        function getHKOIcon(code) {
+            if (code >= 50 && code <= 54) return "☀️";
+            if (code >= 60 && code <= 65) return "🌧️";
+            if (code >= 70 && code <= 77) return "🌙";
+            if (code >= 80 && code <= 85) return "🍃";
+            if (code >= 90 && code <= 93) return "⛈️";
+            return "☁️";
+        }
+        function getOpenMeteoIcon(code) {
+            if(code===0) return "☀️"; if(code<=3) return "⛅"; if(code<=48) return "🌫️";
+            if(code>=51 && code<=67) return "🌧️"; if(code>=71 && code<=86) return "🌨️"; if(code>=95) return "⛈️"; return "☁️";
+        }
+
+        // 區段16: 巴士停靠站和ETA邏輯 (優化穩定版)
+let targetStopSeq = null;
+
+async function findBusStop() {
+    const container = document.getElementById('bus-container');
+    if (!container) return;
+    
+    try {
+        // 1. 獲取該路線所有分站序列
+        const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-stop/${config.busRoute}/outbound/1`);
+        const data = await res.json();
+        const stops = data.data;
+
+        // 2. 獲取該路線所有分站的詳細名稱 (一次性獲取所有名稱比逐個 Fetch 快)
+        // 這裡為了簡化，我們直接在迴圈中尋找匹配
+        for (let s of stops) {
+            const detailRes = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/stop/${s.stop}`);
+            const detail = await detailRes.json();
+            
+            if (detail.data.name_tc.includes(config.busStopKey)) {
+                targetStopSeq = s.seq;
+                console.log(`Bus Stop Found: ${detail.data.name_tc} (Seq: ${targetStopSeq})`);
+                
+                // 立即更新一次並啟動計時器
+                fetchBusETA();
+                // 避免重複設定 Interval
+                if (window.busTimer) clearInterval(window.busTimer);
+                window.busTimer = setInterval(fetchBusETA, 30000); 
+                return;
+            }
+        }
+        container.innerHTML = "Stop Not Found";
+    } catch(e) { 
+        console.error("Bus Stop Search Error:", e);
+        container.innerHTML = "Bus Service Temp Unavailable"; 
+    }
+}
+
+async function fetchBusETA() {
+    if (!targetStopSeq) return;
+    const container = document.getElementById('bus-container');
+    if (!container) return;
+
+    try {
+        const res = await fetch(`https://data.etabus.gov.hk/v1/transport/kmb/route-eta/${config.busRoute}/1`);
+        const json = await res.json();
+        
+        // 篩選出正確的站點序列，並過濾掉沒有 ETA 的班次
+        const buses = json.data
+            .filter(b => parseInt(b.seq) === parseInt(targetStopSeq) && b.eta)
+            .sort((a, b) => new Date(a.eta) - new Date(b.eta))
+            .slice(0, 3);
+
+        container.innerHTML = "";
+        
+        if (buses.length === 0) {
+            container.innerHTML = "<div class='bus-row'>No Service</div>";
+            return;
+        }
+
+        buses.forEach((bus, index) => {
+            const etaTime = new Date(bus.eta);
+            const diffMins = Math.floor((etaTime - new Date()) / 60000);
+            
+            if (diffMins < -1) return; // 過期的不顯示
+
+            const div = document.createElement('div');
+            div.className = "bus-row" + (index === 0 ? " first" : "");
+            
+            const timeStr = etaTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            const minStr = (diffMins <= 0) ? "Arr" : diffMins + "m";
+            
+            div.innerHTML = `<span class="br-time">${timeStr}</span><span class="br-min">${minStr}</span>`;
+            container.appendChild(div);
+        });
+    } catch(e) {
+        console.error("Bus ETA Error:", e);
+    }
+}
+
+        // --- 區段17: 初始化和定時更新任務 ---
+
+/**
+ * 初始化所有數據
+ */
+function initDashboard() {
+    // 1. 立即獲取一次數據，避免開機空白 5 分鐘
+    fetchWeather();
+    fetchHKOWarning();
+    
+    // 2. 啟動時鐘（假設 updateClock 負責更新 DOM 上的時間）
+    updateClock(); 
+    
+    // 3. 設定定時刷新任務
+    const FIVE_MINUTES = 5 * 60 * 1000; // 5分鐘，單位為毫秒
+    const ONE_SECOND = 1000;            // 1秒，單位為毫秒
+
+    // 定時刷新天氣與警告 (每 5 分鐘)
+    setInterval(fetchWeather, FIVE_MINUTES);
+    setInterval(fetchHKOWarning, FIVE_MINUTES);
+
+    // 定時刷新時鐘 (每 1 秒，確保秒數會跳動)
+    setInterval(updateClock, ONE_SECOND);
+    
+    console.log("Dashboard initialized: Weather and Clock updates started.");
+}
+
+// ==========================================
+// 擺喺所有程式碼嘅最後面 (Bottom of Script)
+// ==========================================
+window.onload = function() {
+    console.log("System Starting...");
+
+    // 1. 天氣 & 服裝：每 5 分鐘更新一次
+    fetchWeather();
+    setInterval(fetchWeather, 300000); 
+
+    // 2. 天文台警告 (最即時)：每 1 分鐘更新一次
+    // 確保你有放剛才寫的那個 fetchHKOWarning 函數
+    if (typeof fetchHKOWarning === 'function') {
+        fetchHKOWarning();
+        setInterval(fetchHKOWarning, 60000); 
+    }
+
+    // 3. 巴士 ETA：先搜尋站點，內部會自動啟動 30s 循環
+    if (typeof findBusStop === 'function') {
+        findBusStop(); 
+    }
+};
+    </script>
+</body>
+</html>
